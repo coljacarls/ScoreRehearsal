@@ -98,3 +98,33 @@ off explicitly unless the app needs them.
 
 MuseScore's default shortcuts apply where the commands exist: `Space` play/pause, `Ctrl+O` open,
 `F11` full screen, `Ctrl+Q` quit. Closing a score is in the `…` menu.
+
+## About me and the "why"
+I am a 40-something year old family father with a background in computer science and usability.
+I LOVE music, love arranging it and in MuseScore I found my go-to-software, especially since the
+overhaul led by Martin Keary (aka. Tantacrul). Thanks for making MuseScore a no-brainer with
+premium usability!
+
+In my spare-time I often take the role of a conductor for vocal groups. Because I s*ck at playing
+the piano I tend to use the playback function of MuseScore to play the score, set the focus on
+single voices, scrub through the chords to help the group find their place in the harmony.
+Unfortunately MuseScore has no focus on tablets (yet) and opening a score and using it for the
+porposes of the rehursal sometimes messes up the score. Everything needs to happen fast to keep
+the drive in a rehursal:
+- switching the playback between single voices
+- starting the playback at selected measures or beats
+- mixing the volume levels for certain voices in focus with "the rest"
+- and everything without messing with the score underneath.
+
+MuseScore unfortunately gave me multiple headaches in the past. Although it is the tool I always
+wanted for writing scores (except for one or two things) it is very imperfect for working with the
+scores the way I do during a rehursal, as my digital pianist.
+This is the reason why the idea of this software exists.
+When it comes to writing code, my focus is strongly on web technology and I think I won't become an
+expert in C++ and Co. in the near future. My first idea was to make a pull request in the MuseScore
+project for a "Rehurse" tab, right between the "Score" and the "Publish" tab. But my lack in understanding
+the programming languages needed, I'd never be able to go through the process.
+This is why opened this side-project with a forked MuseScore to build on.
+And yes: the development is AI-first.
+
+Feel free to use it and leave a star if it helps you. Have ideas? Start a discussion!
