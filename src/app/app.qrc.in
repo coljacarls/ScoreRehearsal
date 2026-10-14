@@ -1,0 +1,21 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="configs/update.cfg">@MUSESCORE_APP_CONFIGS_DIR@/update.cfg</file>
+        <file alias="configs/languages.cfg">@MUSESCORE_APP_CONFIGS_DIR@/languages.cfg</file>
+        <file alias="configs/learn.cfg">@MUSESCORE_APP_CONFIGS_DIR@/learn.cfg</file>
+        <file alias="configs/light.cfg">@MUSESCORE_APP_CONFIGS_DIR@/light.cfg</file>
+        <file alias="configs/dark.cfg">@MUSESCORE_APP_CONFIGS_DIR@/dark.cfg</file>
+        <file alias="configs/high_contrast_black.cfg">@MUSESCORE_APP_CONFIGS_DIR@/high_contrast_black.cfg</file>
+        <file alias="configs/high_contrast_white.cfg">@MUSESCORE_APP_CONFIGS_DIR@/high_contrast_white.cfg</file>
+        <file alias="configs/shortcuts.cfg">@MUSESCORE_APP_CONFIGS_DIR@/shortcuts.cfg</file>
+        <file alias="configs/data/shortcuts.xml">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts.xml</file>
+        <file alias="configs/data/shortcuts_mac.xml">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts_mac.xml</file>
+        <file alias="configs/data/shortcuts_azerty.xml">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts_azerty.xml</file>
+        <file alias="configs/data/shortcuts.json">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts.json</file>
+        <file alias="configs/data/shortcuts_mac.json">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts_mac.json</file>
+        <file alias="configs/data/shortcuts_azerty.json">@MUSESCORE_APP_CONFIGS_DIR@/data/shortcuts_azerty.json</file>
+        <file alias="configs/workspaces.cfg">@MUSESCORE_APP_CONFIGS_DIR@/workspaces.cfg</file>
+        <file alias="configs/ui.cfg">@MUSESCORE_APP_CONFIGS_DIR@/ui.cfg</file>
+        <file alias="configs/user_agent.cfg">@MUSESCORE_APP_CONFIGS_DIR@/user_agent.cfg</file>
+    </qresource>
+</RCC>
