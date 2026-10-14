@@ -17,4 +17,4 @@ components. GPL-3.0-only. No MuseScore name/logo in the app.
 - Build: `build.cmd install Release`; run `build\Release\install\bin\ScoreRehearsal.exe`.
 - Update MuseScore: merge upstream into the fork branch, bump the submodule,
   re-check `src/cmake/Configure.cmake`.
-- Talk to the maintainer in German; code and docs in English.
+- Code, comments and docs in English.
