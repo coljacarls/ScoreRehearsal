@@ -52,6 +52,7 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_INTERFACES(QQmlParserStatus)
 
     Q_PROPERTY(bool hasSolo READ hasSolo NOTIFY hasSoloChanged)
+    Q_PROPERTY(QStringList soloPartIds READ soloPartIds NOTIFY soloPartIdsChanged)
     Q_PROPERTY(float accompanimentDb READ accompanimentDb WRITE setAccompanimentDb NOTIFY accompanimentDbChanged)
     Q_PROPERTY(float minVolumeDb READ minVolumeDb CONSTANT)
     Q_PROPERTY(float maxVolumeDb READ maxVolumeDb CONSTANT)
@@ -87,6 +88,9 @@ public:
 
     bool hasSolo() const;
 
+    //! Ids of the parts that have a solo track (own or by group); empty without solo
+    QStringList soloPartIds() const;
+
     float accompanimentDb() const;
     void setAccompanimentDb(float db);
 
@@ -111,6 +115,7 @@ public:
 
 signals:
     void hasSoloChanged();
+    void soloPartIdsChanged();
     void accompanimentDbChanged();
     void structureChanged();
 
@@ -169,6 +174,7 @@ private:
     int m_nextGroupId = 1;
     float m_accompanimentDb = playback::REHEARSAL_VOLUME_DB_MIN;
     bool m_hasSolo = false;
+    QStringList m_soloPartIds;
     bool m_overrideApplied = false;
 };
 }

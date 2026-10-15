@@ -33,7 +33,9 @@
 #include "draw/painter.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/page.h"
+#include "engraving/dom/part.h"
 #include "engraving/dom/score.h"
+#include "engraving/dom/staff.h"
 #include "engraving/dom/system.h"
 #include "notation/inotationelements.h"
 #include "notation/inotationpainting.h"
@@ -78,6 +80,12 @@ constexpr int RENDER_WATCH_MS = 250;
 
 //! Memory the tiles of the score may take up (as images, before the upload to the GPU)
 constexpr qint64 TILE_MEMORY_BUDGET = 256ll * 1024 * 1024;
+
+//! Length of the gradient between a lit staff and the shade (logical pixels of the window)
+constexpr qreal SHADE_FADE_PX = 50.0;
+
+//! Space around the lit staves that stays lit, in staff spaces
+constexpr qreal LIT_MARGIN_SPACES = 1.5;
 
 //! Width of the image of the sticky panel, relative to the width of the view
 constexpr qreal PANEL_IMAGE_WIDTH_RATIO = 0.6;
@@ -130,6 +138,29 @@ QColor PresentationPaintView::playheadColor() const
     return notationConfig()->playbackCursorColor();
 }
 
+QStringList PresentationPaintView::soloPartIds() const
+{
+    return m_soloPartIds;
+}
+
+void PresentationPaintView::setSoloPartIds(const QStringList& ids)
+{
+    if (m_soloPartIds == ids) {
+        return;
+    }
+
+    m_soloPartIds = ids;
+    m_shadeDirty = true;
+    emit soloPartIdsChanged();
+
+    updateShadeBands();
+}
+
+QVariantList PresentationPaintView::shadeBands() const
+{
+    return m_shadeBands;
+}
+
 void PresentationPaintView::initZoomAndPosition()
 {
 }
@@ -169,6 +200,7 @@ void PresentationPaintView::onLoadNotation(INotationPtr notation)
 
     //! The rendered score is outdated when the content or the colors change
     notation->notationChanged().onReceive(&m_subscriptions, [this](const RectF&) {
+        m_shadeDirty = true;
         scheduleRebuild(REBUILD_DELAY_MS);
     }, async::Asyncable::Mode::SetReplace);
 
@@ -366,6 +398,100 @@ void PresentationPaintView::alignToCursor(const RectF& cursorRect)
 
     moveCanvasToPosition(PointF(left, top));
     updatePlayhead(cursorRect);
+    updateShadeBands();
+}
+
+void PresentationPaintView::updateShadeBands()
+{
+    const qreal scaling = currentScaling();
+    if (!m_shadeDirty && qFuzzyCompare(scaling, m_shadeScaling)) {
+        return;
+    }
+
+    m_shadeDirty = false;
+    m_shadeScaling = scaling;
+
+    //! Lit stretches of the window height (view coordinates), merged and sorted
+    std::vector<std::pair<qreal, qreal> > lit;
+
+    const engraving::Score* score = notation() ? notation()->elements()->msScore() : nullptr;
+    if (score && !m_soloPartIds.isEmpty() && !score->systems().empty() && scaling > 0.0 && height() > 0.0) {
+        const engraving::System* system = score->systems().front();
+        const qreal margin = LIT_MARGIN_SPACES * score->style().spatium();
+
+        for (const engraving::Part* part : score->parts()) {
+            if (!m_soloPartIds.contains(QString::fromStdString(part->id().toStdString()))) {
+                continue;
+            }
+
+            for (const engraving::Staff* staff : part->staves()) {
+                const engraving::SysStaff* sysStaff = system->staff(staff->idx());
+                if (!sysStaff || !sysStaff->show()) {
+                    continue;
+                }
+
+                const qreal top = system->canvasPos().y() + sysStaff->bbox().top() - margin;
+                const qreal bottom = system->canvasPos().y() + sysStaff->bbox().bottom() + margin;
+                lit.emplace_back(fromLogical(PointF(0.0, top)).y(), fromLogical(PointF(0.0, bottom)).y());
+            }
+        }
+    }
+
+    std::sort(lit.begin(), lit.end());
+
+    std::vector<std::pair<qreal, qreal> > merged;
+    for (const auto& [top, bottom] : lit) {
+        if (!merged.empty() && top <= merged.back().second) {
+            merged.back().second = std::max(merged.back().second, bottom);
+        } else {
+            merged.emplace_back(top, bottom);
+        }
+    }
+
+    QVariantList bands;
+    const auto addBand = [&bands](qreal from, qreal to, bool fadeTop, bool fadeBottom) {
+        const qreal h = to - from;
+        if (h <= 0.0) {
+            return;
+        }
+
+        //! Two fades in one stripe share it when it is short
+        const qreal fadeLength = std::min(SHADE_FADE_PX, h / ((fadeTop && fadeBottom) ? 2.0 : 1.0));
+        bands.append(QVariantMap {
+            { "y", from },
+            { "height", h },
+            { "fadeTop", fadeTop ? fadeLength : 0.0 },
+            { "fadeBottom", fadeBottom ? fadeLength : 0.0 }
+        });
+    };
+
+    if (!merged.empty()) {
+        const qreal viewHeight = height();
+        qreal cursorY = 0.0;
+        bool first = true;
+
+        for (const auto& [top, bottom] : merged) {
+            if (bottom <= 0.0 || top >= viewHeight) {
+                continue;
+            }
+
+            addBand(cursorY, std::max(top, 0.0), !first, top > 0.0);
+            cursorY = std::max(cursorY, bottom);
+            first = false;
+        }
+
+        if (first) {
+            //! No solo staff in view: everything is shaded
+            addBand(0.0, viewHeight, false, false);
+        } else {
+            addBand(cursorY, viewHeight, true, false);
+        }
+    }
+
+    if (bands != m_shadeBands) {
+        m_shadeBands = bands;
+        emit shadeBandsChanged();
+    }
 }
 
 void PresentationPaintView::updatePlayhead(const RectF& cursorRect)
