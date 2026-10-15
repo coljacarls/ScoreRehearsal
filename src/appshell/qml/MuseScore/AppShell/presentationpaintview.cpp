@@ -85,7 +85,7 @@ constexpr qint64 TILE_MEMORY_BUDGET = 256ll * 1024 * 1024;
 constexpr qreal SHADE_FADE_PX = 40.0;
 
 //! The lit stretches are taller by this share of their height (half of it at each end)
-constexpr qreal LIT_GROWTH = 0.30;
+constexpr qreal LIT_GROWTH = 0.60;
 
 //! Space around the lit staves that stays lit, in staff spaces
 constexpr qreal LIT_MARGIN_SPACES = 1.5;
@@ -435,7 +435,10 @@ void PresentationPaintView::updateShadeBands()
 
                 const qreal top = system->canvasPos().y() + sysStaff->bbox().top() - margin;
                 const qreal bottom = system->canvasPos().y() + sysStaff->bbox().bottom() + margin;
-                lit.emplace_back(fromLogical(PointF(0.0, top)).y(), fromLogical(PointF(0.0, bottom)).y());
+                const qreal topPx = fromLogical(PointF(0.0, top)).y();
+                const qreal bottomPx = fromLogical(PointF(0.0, bottom)).y();
+                const qreal grow = (bottomPx - topPx) * LIT_GROWTH / 2.0;
+                lit.emplace_back(topPx - grow, bottomPx + grow);
             }
         }
     }
@@ -444,17 +447,12 @@ void PresentationPaintView::updateShadeBands()
 
     std::vector<std::pair<qreal, qreal> > merged;
     for (const auto& [top, bottom] : lit) {
-        if (!merged.empty() && top <= merged.back().second) {
+        //! Two fades that would meet leave no dark stripe between the staves: one large lit area
+        if (!merged.empty() && top <= merged.back().second + 2 * SHADE_FADE_PX) {
             merged.back().second = std::max(merged.back().second, bottom);
         } else {
             merged.emplace_back(top, bottom);
         }
-    }
-
-    for (auto& [top, bottom] : merged) {
-        const qreal grow = (bottom - top) * LIT_GROWTH / 2.0;
-        top -= grow;
-        bottom += grow;
     }
 
     QVariantList bands;
