@@ -27,6 +27,8 @@ qt_add_qml_module(appshell_qml
     SOURCES
         aboutmodel.cpp
         aboutmodel.h
+        audiosettingsmodel.cpp
+        audiosettingsmodel.h
         fadergroups.cpp
         fadergroups.h
         mainwindowtitleprovider.cpp
@@ -44,6 +46,7 @@ qt_add_qml_module(appshell_qml
     QML_FILES
         AboutDialog.qml
         AppWindow.qml
+        AudioSettingsDialog.qml
         FaderGroupDialog.qml
         OpenScorePlaceholder.qml
         PresentationWindow.qml

@@ -221,6 +221,7 @@ Item {
                     { id: "fullscreen", title: qsTrc("appshell", "Full screen"), checkable: true, checked: root.pageModel.isFullScreen },
                     { id: "darktheme", title: qsTrc("appshell", "Dark theme"), checkable: true, checked: root.pageModel.isDarkTheme },
                     { },
+                    { id: "settings", title: qsTrc("appshell", "Settings…") },
                     { id: "about", title: qsTrc("appshell", "About ScoreRehearsal…") },
                     { },
                     { id: "quit", title: qsTrc("appshell", "Quit") }
@@ -237,6 +238,7 @@ Item {
                     case "close": root.pageModel.closeScore(); break
                     case "fullscreen": root.pageModel.setFullScreen(!root.pageModel.isFullScreen); break
                     case "darktheme": root.pageModel.setDarkTheme(!root.pageModel.isDarkTheme); break
+                    case "settings": audioSettingsDialog.open(); break
                     case "about": root.pageModel.showAbout(); break
                     case "quit": root.pageModel.quit(); break
                     }
@@ -390,6 +392,23 @@ Item {
 
         mixerModel: tracksPanel.mixerModel
         navigationSection: faderGroupDialogNavSec
+    }
+
+    NavigationSection {
+        id: audioSettingsNavSec
+        name: "AudioSettingsDialog"
+        enabled: audioSettingsDialog.visible
+        order: 8
+    }
+
+    //! Modal settings dialog (audio driver and buffer size), over the whole page
+    AudioSettingsDialog {
+        id: audioSettingsDialog
+
+        anchors.fill: parent
+        z: 100
+
+        navigationSection: audioSettingsNavSec
     }
 
     //! Drag & drop of score files anywhere on the page
