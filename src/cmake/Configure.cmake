@@ -29,9 +29,27 @@
 # (MUE_BUILD_*) and musescore/muse/framework/cmake/MuseDeclareOptions.cmake (MUSE_MODULE_*).
 # Every new module option should be switched OFF here explicitly unless the app needs it.
 
-set(SCOREREHEARSAL_VERSION "0.1.0")
+# App version: CI passes the release version (SCOREREHEARSAL_VERSION environment
+# variable, set from the release tag); local builds fall back to `git describe`
+if (DEFINED ENV{SCOREREHEARSAL_VERSION} AND NOT "$ENV{SCOREREHEARSAL_VERSION}" STREQUAL "")
+    set(SCOREREHEARSAL_VERSION "$ENV{SCOREREHEARSAL_VERSION}")
+else()
+    execute_process(
+        COMMAND git describe --tags --match "v[0-9]*" --dirty
+        WORKING_DIRECTORY ${MUE_EXTERNAL_APP_DIR}
+        OUTPUT_VARIABLE SCOREREHEARSAL_GIT_DESCRIBE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE SCOREREHEARSAL_GIT_RESULT
+    )
+    if (SCOREREHEARSAL_GIT_RESULT EQUAL 0 AND NOT SCOREREHEARSAL_GIT_DESCRIBE STREQUAL "")
+        string(REGEX REPLACE "^v" "" SCOREREHEARSAL_VERSION "${SCOREREHEARSAL_GIT_DESCRIBE}")
+    else()
+        set(SCOREREHEARSAL_VERSION "0.0.0-dev")
+    endif()
+endif()
+message(STATUS "ScoreRehearsal version: ${SCOREREHEARSAL_VERSION}")
 add_compile_definitions(
-    SCOREREHEARSAL_VERSION="${SCOREREHEARSAL_VERSION}"
     MUE_APP_ORGANIZATION_NAME="ScoreRehearsal"
     MUE_APP_ORGANIZATION_DOMAIN="scorerehearsal.carls.de"
 )

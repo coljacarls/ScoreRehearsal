@@ -42,6 +42,12 @@ target_sources(appshell PRIVATE
     widgets/splashscreen/splashscreen.h
 )
 
+# The version changes with every commit (git describe), so only this file gets it
+set_source_files_properties(internal/appshellconfiguration.cpp PROPERTIES
+    COMPILE_DEFINITIONS "SCOREREHEARSAL_VERSION=\"${SCOREREHEARSAL_VERSION}\""
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
+
 # musescore/src/app/main.cpp expects this resource (QT_OPENGL_BUGLIST)
 qt_add_resources(appshell appshell_resources
     PREFIX

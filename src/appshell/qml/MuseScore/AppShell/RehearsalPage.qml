@@ -281,7 +281,7 @@ Item {
             anchors.bottom: parent.bottom
         }
 
-        RehearsalTracksPanel {
+        RehearsalMixerPanel {
             id: tracksPanel
 
             anchors.top: parent.top
@@ -294,6 +294,10 @@ Item {
 
             navigationSection: tracksPanelNavSec
             navigationOrderStart: 1
+
+            onCreateGroupRequested: {
+                faderGroupDialog.open()
+            }
         }
 
         //! Floating control bar of the immersive mode
@@ -339,6 +343,24 @@ Item {
                 }
             }
         }
+    }
+
+    NavigationSection {
+        id: faderGroupDialogNavSec
+        name: "FaderGroupDialog"
+        enabled: faderGroupDialog.visible
+        order: 7
+    }
+
+    //! Modal dialog to create a fader group, over the whole page
+    FaderGroupDialog {
+        id: faderGroupDialog
+
+        anchors.fill: parent
+        z: 100
+
+        mixerModel: tracksPanel.mixerModel
+        navigationSection: faderGroupDialogNavSec
     }
 
     //! Drag & drop of score files anywhere on the page

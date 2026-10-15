@@ -27,15 +27,21 @@ qt_add_qml_module(appshell_qml
     SOURCES
         aboutmodel.cpp
         aboutmodel.h
+        fadergroups.cpp
+        fadergroups.h
         mainwindowtitleprovider.cpp
         mainwindowtitleprovider.h
+        rehearsalmixermodel.cpp
+        rehearsalmixermodel.h
         rehearsalpagemodel.cpp
         rehearsalpagemodel.h
     QML_FILES
         AboutDialog.qml
         AppWindow.qml
+        FaderGroupDialog.qml
         OpenScorePlaceholder.qml
         RehearsalControls.qml
+        RehearsalMixerPanel.qml
         RehearsalNotationView.qml
         RehearsalPage.qml
     RESOURCES
@@ -48,6 +54,9 @@ qt_add_qml_module(appshell_qml
         TARGET notationscene_qml
         TARGET playback_qml
 )
+
+# RehearsalMixerModel uses the rehearsal mix calculation of the playback module
+target_link_libraries(appshell_qml PRIVATE playback)
 
 if (OS_IS_MAC)
     qt_target_qml_sources(appshell_qml

@@ -37,6 +37,10 @@ Item {
         accessible.name: qsTrc("appshell", "Open score")
     }
 
+    AboutModel {
+        id: aboutModel
+    }
+
     Column {
         anchors.centerIn: parent
         width: Math.min(420, parent.width - 48)
@@ -82,5 +86,15 @@ Item {
                 root.openRequested()
             }
         }
+    }
+
+    StyledTextLabel {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 12
+
+        text: qsTrc("appshell", "Version %1").arg(aboutModel.appVersion())
+        font: ui.theme.bodyFont
+        opacity: 0.6
     }
 }

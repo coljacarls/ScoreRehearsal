@@ -64,6 +64,17 @@ build\Release\install\bin\ScoreRehearsal.exe path\to\score.mscz
 `build.cmd configure|build|install|run|clean [Release|Debug|RelWithDebInfo]`; the install step
 runs `windeployqt`, so `build\<type>\install` is a complete, relocatable application directory.
 
+The app version comes from the `SCOREREHEARSAL_VERSION` environment variable (set by CI) or,
+for local builds, from `git describe --tags` (`0.0.0-dev` without tags). It is shown on the
+start screen and in the About dialog.
+
+## Releases
+
+`.github/workflows/release.yml` builds and publishes a GitHub release (zip of the install
+directory, tag `vX.Y.Z` on the merge commit) when a pull request is merged into `main` and
+either its title contains a version (`Release v1.0.1`) or it has a label `release:major`,
+`release:minor` or `release:patch` (bumps the latest tag). Other pull requests do not release.
+
 ## Updating the MuseScore dependency
 
 MuseScore is pulled in through the submodule, so updating is a merge in the fork plus a pointer
