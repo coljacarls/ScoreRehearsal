@@ -264,6 +264,14 @@ Item {
             onOpenRequested: {
                 root.pageModel.openScore()
             }
+
+            onOpenSessionRequested: function(sessionId) {
+                root.pageModel.openSession(sessionId)
+            }
+
+            onRemoveSessionRequested: function(sessionId) {
+                root.pageModel.removeSession(sessionId)
+            }
         }
 
         RehearsalNotationView {

@@ -13,6 +13,8 @@ components. GPL-3.0-only. No MuseScore name/logo in the app.
 - Never push to musescore/* (remotes `upstream` are read-only). Push only to the
   coljacarls forks and this repo.
 - App-specific code belongs here, not in the fork. Keep fork hooks tiny/generic.
+- Sessions (per score file: faders, fader groups, view mode, playhead measure) are stored per user in
+  `sessions.json` (app data folder); see `rehearsalsessionstore.*`.
 - The app never writes scores: no save, autosave, migration or save prompts.
 - Build: `build.cmd install Release`; run `build\Release\install\bin\ScoreRehearsal.exe`.
 - Update MuseScore: merge upstream into the fork branch, bump the submodule,

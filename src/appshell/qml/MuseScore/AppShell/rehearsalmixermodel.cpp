@@ -25,7 +25,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <unordered_map>
+
+#include <QJsonArray>
+#include <QJsonObject>
 
 #include "async/notifylist.h"
 #include "log.h"
@@ -37,6 +41,8 @@
 
 #include "project/inotationproject.h"
 #include "project/types/projecturis.h"
+
+#include "rehearsalsessionstore.h"
 
 using namespace muse;
 using namespace mu::appshell;
@@ -76,6 +82,114 @@ struct RehearsalMixerSession {
     float accompanimentDb = REHEARSAL_VOLUME_DB_MIN; // silent the first time in a session
 };
 
+QString trackKey(const InstrumentTrackId& id)
+{
+    return QString::fromStdString(id.partId.toStdString()) + QLatin1Char('|') + id.instrumentId.toQString();
+}
+
+std::optional<InstrumentTrackId> trackIdFromKey(const QString& key)
+{
+    const int separator = key.indexOf(QLatin1Char('|'));
+    if (separator <= 0) {
+        return std::nullopt;
+    }
+
+    bool ok = false;
+    const quint64 partId = key.left(separator).toULongLong(&ok);
+    if (!ok) {
+        return std::nullopt;
+    }
+
+    return InstrumentTrackId { muse::ID(static_cast<uint64_t>(partId)), String::fromQString(key.mid(separator + 1)) };
+}
+
+QJsonObject mixerToJson(const RehearsalMixerSession& session)
+{
+    QJsonObject tracks;
+    for (const auto& [id, state] : session.tracks) {
+        tracks[trackKey(id)] = QJsonObject {
+            { "on", state.isOn },
+            { "solo", state.isSolo },
+            { "volumeDb", static_cast<double>(state.volumeDb) }
+        };
+    }
+
+    QJsonArray groups;
+    for (const FaderGroup& group : session.groups) {
+        QJsonArray members;
+        for (const InstrumentTrackId& member : group.members) {
+            members.append(trackKey(member));
+        }
+
+        groups.append(QJsonObject {
+            { "id", group.id },
+            { "name", group.name },
+            { "on", group.isOn },
+            { "solo", group.isSolo },
+            { "volumeDb", static_cast<double>(group.volumeDb) },
+            { "expanded", group.isExpanded },
+            { "members", members }
+        });
+    }
+
+    return QJsonObject {
+        { "accompanimentDb", static_cast<double>(session.accompanimentDb) },
+        { "nextGroupId", session.nextGroupId },
+        { "tracks", tracks },
+        { "groups", groups }
+    };
+}
+
+void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
+{
+    if (json.isEmpty()) {
+        return;
+    }
+
+    session.accompanimentDb = normalizedMixerDb(static_cast<float>(json.value("accompanimentDb").toDouble(REHEARSAL_VOLUME_DB_MIN)));
+    session.nextGroupId = std::max(1, json.value("nextGroupId").toInt(1));
+
+    const QJsonObject tracks = json.value("tracks").toObject();
+    for (auto it = tracks.begin(); it != tracks.end(); ++it) {
+        const std::optional<InstrumentTrackId> id = trackIdFromKey(it.key());
+        if (!id) {
+            continue;
+        }
+
+        const QJsonObject o = it.value().toObject();
+        RehearsalTrackState state;
+        state.instrumentTrackId = *id;
+        state.isOn = o.value("on").toBool(true);
+        state.isSolo = o.value("solo").toBool(false);
+        state.volumeDb = normalizedMixerDb(static_cast<float>(o.value("volumeDb").toDouble(REHEARSAL_VOLUME_DB_MAX)));
+        session.tracks[*id] = state;
+    }
+
+    for (const QJsonValue& value : json.value("groups").toArray()) {
+        const QJsonObject o = value.toObject();
+
+        FaderGroup group;
+        group.id = o.value("id").toInt();
+        group.name = o.value("name").toString();
+        group.isOn = o.value("on").toBool(true);
+        group.isSolo = o.value("solo").toBool(false);
+        group.volumeDb = normalizedMixerDb(static_cast<float>(o.value("volumeDb").toDouble(REHEARSAL_VOLUME_DB_MAX)));
+        group.isExpanded = o.value("expanded").toBool(false);
+
+        for (const QJsonValue& member : o.value("members").toArray()) {
+            if (const std::optional<InstrumentTrackId> id = trackIdFromKey(member.toString())) {
+                group.members.push_back(*id);
+            }
+        }
+
+        if (!group.name.isEmpty() && !group.members.empty()) {
+            session.nextGroupId = std::max(session.nextGroupId, group.id + 1);
+            session.groups.push_back(std::move(group));
+        }
+    }
+}
+
+//! The in-memory state of the open project, loaded from the stored session of its file
 RehearsalMixerSession& mixerSessionFor(const INotationProjectPtr& project)
 {
     static std::vector<RehearsalMixerSession> s_sessions;
@@ -92,6 +206,13 @@ RehearsalMixerSession& mixerSessionFor(const INotationProjectPtr& project)
 
     RehearsalMixerSession& session = s_sessions.emplace_back();
     session.project = project;
+
+    if (project) {
+        RehearsalSessionStore& store = RehearsalSessionStore::instance();
+        const RehearsalSession& stored = store.ensureForPath(project->path().toQString(), project->displayName());
+        mixerFromJson(stored.mixer, session);
+    }
+
     return session;
 }
 }
@@ -801,6 +922,12 @@ void RehearsalMixerModel::saveSession()
 
     for (const Track& track : m_tracks) {
         session.tracks[track.state.instrumentTrackId] = track.state;
+    }
+
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    if (RehearsalSession* stored = store.findByPath(project->path().toQString())) {
+        stored->mixer = mixerToJson(session);
+        store.markChanged(stored->id);
     }
 }
 
