@@ -29,7 +29,7 @@ import Muse.UiComponents
 import MuseScore.AppShell
 
 //! Rehearsal controls: to start, play/pause, position, metronome, view mode,
-//! tracks panel toggle, fullscreen (immersive) toggle.
+//! tracks panel toggle, presentation window toggle, fullscreen (immersive) toggle.
 //! Used in the main tab row and in the floating bar of the immersive mode
 Item {
     id: root
@@ -226,6 +226,28 @@ Item {
             width: root.buttonSize
             height: root.buttonSize
 
+            icon: IconCode.OPEN_LINK
+            iconFont: root.iconFont
+            accentButton: root.pageModel.isPresentationWindowOpen
+            transparent: !root.pageModel.isPresentationWindowOpen
+
+            toolTipTitle: root.pageModel.isPresentationWindowOpen ? qsTrc("appshell", "Close presentation window")
+                                                                  : qsTrc("appshell", "Presentation window")
+            accessible.checked: root.pageModel.isPresentationWindowOpen
+
+            navigation.panel: navPanel
+            navigation.order: 6
+
+            onClicked: {
+                root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
+            }
+        }
+
+        FlatButton {
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.buttonSize
+            height: root.buttonSize
+
             icon: root.immersive ? IconCode.APP_UNMAXIMIZE : IconCode.APP_MAXIMIZE
             iconFont: root.iconFont
             transparent: true
@@ -234,7 +256,7 @@ Item {
             accessible.checked: root.immersive
 
             navigation.panel: navPanel
-            navigation.order: 6
+            navigation.order: 7
 
             onClicked: {
                 root.toggleImmersiveRequested()

@@ -68,6 +68,9 @@ Item {
 
         property bool immersive: false
         property bool fullScreenSetByImmersive: false
+
+        //! Where the presentation window was the last time (e.g. on the second screen)
+        property rect presentationGeometry: Qt.rect(100, 100, 1280, 360)
     }
 
     Connections {
@@ -350,6 +353,23 @@ Item {
                 onToggleImmersiveRequested: {
                     root.setImmersive(!root.immersive)
                 }
+            }
+        }
+    }
+
+    //! The window for the audience; the model keeps the session-wide "open" state,
+    //! so the button in either control bar (top bar, floating bar) opens and closes it
+    Loader {
+        id: presentationWindowLoader
+
+        active: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen
+
+        sourceComponent: PresentationWindow {
+            initialGeometry: prv.presentationGeometry
+
+            onCloseRequested: function(geometry) {
+                prv.presentationGeometry = geometry
+                root.pageModel.isPresentationWindowOpen = false
             }
         }
     }
