@@ -123,6 +123,9 @@ private:
     //! need to be calculated again when the scaling, the score or the solo parts change
     void updateShadeBands();
 
+    //! Number of staves in the system that are shown (hidden ones take no room)
+    int visibleStaffCount();
+
     //! Width of about one measure (in logical units)
     qreal measureWidth() const;
 
@@ -169,6 +172,10 @@ private:
     QVariantList m_shadeBands;
     qreal m_shadeScaling = 0.0;
     bool m_shadeDirty = true;
+
+    int m_visibleStaffCount = 0;
+    const void* m_countedSystem = nullptr;
+    bool m_staffCountDirty = true;
     QRectF m_playheadRect;
 
     //! Vertical extent of the system (in logical units), known after the first cursor position
