@@ -82,7 +82,10 @@ constexpr int RENDER_WATCH_MS = 250;
 constexpr qint64 TILE_MEMORY_BUDGET = 256ll * 1024 * 1024;
 
 //! Length of the gradient between a lit staff and the shade (logical pixels of the window)
-constexpr qreal SHADE_FADE_PX = 50.0;
+constexpr qreal SHADE_FADE_PX = 40.0;
+
+//! The lit stretches are taller by this share of their height (half of it at each end)
+constexpr qreal LIT_GROWTH = 0.30;
 
 //! Space around the lit staves that stays lit, in staff spaces
 constexpr qreal LIT_MARGIN_SPACES = 1.5;
@@ -446,6 +449,12 @@ void PresentationPaintView::updateShadeBands()
         } else {
             merged.emplace_back(top, bottom);
         }
+    }
+
+    for (auto& [top, bottom] : merged) {
+        const qreal grow = (bottom - top) * LIT_GROWTH / 2.0;
+        top -= grow;
+        bottom += grow;
     }
 
     QVariantList bands;
