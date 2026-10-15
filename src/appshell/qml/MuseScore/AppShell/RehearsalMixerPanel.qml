@@ -167,7 +167,7 @@ Rectangle {
     Rectangle {
         id: accompanimentRow
 
-        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: prv.margins
@@ -246,11 +246,11 @@ Rectangle {
     StyledFlickable {
         id: flickable
 
-        anchors.top: accompanimentRow.bottom
-        anchors.topMargin: accompanimentRow.visible ? prv.cardSpacing : 0
+        anchors.top: header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.bottom: accompanimentRow.visible ? accompanimentRow.top : parent.bottom
+        anchors.bottomMargin: accompanimentRow.visible ? prv.cardSpacing : 0
 
         contentHeight: rowsColumn.height + prv.cardSpacing
 
