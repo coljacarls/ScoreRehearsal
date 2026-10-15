@@ -28,7 +28,9 @@
 #include <QImage>
 #include <QQuickWindow>
 #include <QRectF>
+#include <QStringList>
 #include <QTimer>
+#include <QVariantList>
 #include <qqmlintegration.h>
 
 #include "async/asyncable.h"
@@ -67,6 +69,8 @@ class PresentationPaintView : public notation::AbstractNotationPaintView
 
     Q_PROPERTY(QRectF playheadRect READ playheadRect NOTIFY playheadRectChanged)
     Q_PROPERTY(QColor playheadColor READ playheadColor CONSTANT)
+    Q_PROPERTY(QStringList soloPartIds READ soloPartIds WRITE setSoloPartIds NOTIFY soloPartIdsChanged)
+    Q_PROPERTY(QVariantList shadeBands READ shadeBands NOTIFY shadeBandsChanged)
 
     QML_ELEMENT
 
@@ -82,8 +86,18 @@ public:
     QRectF playheadRect() const;
     QColor playheadColor() const;
 
+    //! Parts to keep lit (the solo parts of the rehearsal view); everything else is shaded. Empty: no shade.
+    QStringList soloPartIds() const;
+    void setSoloPartIds(const QStringList& ids);
+
+    //! The shaded stripes of the window height, in view coordinates, top to bottom:
+    //! [{ y, height, fadeTop, fadeBottom }]. The fade is the length of the gradient to the lit staves.
+    QVariantList shadeBands() const;
+
 signals:
     void playheadRectChanged();
+    void soloPartIdsChanged();
+    void shadeBandsChanged();
 
 private slots:
     void onWindowChanged(QQuickWindow* window);
@@ -104,6 +118,10 @@ private:
     //! Scales the score to the window height and puts the cursor at its fixed place
     void alignToCursor(const muse::RectF& cursorRect);
     void updatePlayhead(const muse::RectF& cursorRect);
+
+    //! The vertical position of the staves does not change while playing: the stripes only
+    //! need to be calculated again when the scaling, the score or the solo parts change
+    void updateShadeBands();
 
     //! Width of about one measure (in logical units)
     qreal measureWidth() const;
@@ -146,6 +164,11 @@ private:
     muse::async::Asyncable m_subscriptions;
 
     muse::RectF m_lastCursorRect;
+
+    QStringList m_soloPartIds;
+    QVariantList m_shadeBands;
+    qreal m_shadeScaling = 0.0;
+    bool m_shadeDirty = true;
     QRectF m_playheadRect;
 
     //! Vertical extent of the system (in logical units), known after the first cursor position

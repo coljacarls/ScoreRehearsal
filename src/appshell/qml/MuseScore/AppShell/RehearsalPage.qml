@@ -426,6 +426,7 @@ Item {
 
         sourceComponent: PresentationWindow {
             initialGeometry: prv.presentationGeometry
+            soloPartIds: tracksPanel.mixerModel.soloPartIds
 
             onCloseRequested: function(geometry) {
                 prv.presentationGeometry = geometry

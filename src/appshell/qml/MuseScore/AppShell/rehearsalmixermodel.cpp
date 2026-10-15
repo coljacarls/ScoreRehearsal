@@ -893,9 +893,33 @@ void RehearsalMixerModel::onValuesChanged()
     updateMixOverride();
 }
 
+QStringList RehearsalMixerModel::soloPartIds() const
+{
+    return m_soloPartIds;
+}
+
 void RehearsalMixerModel::updateHasSolo()
 {
-    const bool hasSolo = hasAnySolo(effectiveTrackStates());
+    const std::vector<RehearsalTrackState> states = effectiveTrackStates();
+
+    QStringList soloPartIds;
+    for (const RehearsalTrackState& state : states) {
+        if (!state.isSolo) {
+            continue;
+        }
+
+        const QString partId = QString::fromStdString(state.instrumentTrackId.partId.toStdString());
+        if (!soloPartIds.contains(partId)) {
+            soloPartIds << partId;
+        }
+    }
+
+    if (m_soloPartIds != soloPartIds) {
+        m_soloPartIds = soloPartIds;
+        emit soloPartIdsChanged();
+    }
+
+    const bool hasSolo = hasAnySolo(states);
     if (m_hasSolo == hasSolo) {
         return;
     }

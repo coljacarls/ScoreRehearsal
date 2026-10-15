@@ -32,6 +32,9 @@ Window {
 
     //! Remembered by the rehearsal page between openings
     property rect initialGeometry: Qt.rect(0, 0, 1280, 360)
+
+    //! Parts that are solo in the rehearsal view: the rest of the score is shaded
+    property var soloPartIds: []
     signal closeRequested(rect geometry)
 
     title: qsTrc("appshell", "Presentation")
@@ -75,9 +78,51 @@ Window {
             color: scoreView.playheadColor
         }
 
+        soloPartIds: root.soloPartIds
+
         Component.onCompleted: {
             scoreView.load()
         }
+    }
+
+    //! Fixed above the score: only the score underneath moves while playing.
+    //! Dark stripes over everything but the solo staves, with a soft gradient (not a hard edge) to them.
+    Repeater {
+        model: scoreView.shadeBands
+
+        Rectangle {
+            required property var modelData
+
+            x: 0
+            y: modelData.y
+            width: root.width
+            height: modelData.height
+
+            gradient: Gradient {
+                GradientStop {
+                    position: 0.0
+                    color: modelData.fadeTop > 0 ? "transparent" : prv.shadeColor
+                }
+                GradientStop {
+                    position: modelData.fadeTop / modelData.height
+                    color: prv.shadeColor
+                }
+                GradientStop {
+                    position: 1.0 - modelData.fadeBottom / modelData.height
+                    color: prv.shadeColor
+                }
+                GradientStop {
+                    position: 1.0
+                    color: modelData.fadeBottom > 0 ? "transparent" : prv.shadeColor
+                }
+            }
+        }
+    }
+
+    QtObject {
+        id: prv
+
+        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.72)
     }
 
     MouseArea {
