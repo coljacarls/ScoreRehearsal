@@ -51,6 +51,10 @@ FocusScope {
         id: audioModel
     }
 
+    PresentationSettingsModel {
+        id: presentationModel
+    }
+
     Component.onCompleted: {
         audioModel.load()
     }
@@ -208,6 +212,68 @@ FocusScope {
                 wrapMode: Text.WordWrap
                 opacity: 0.7
                 text: qsTrc("appshell", "If playback stutters, choose a larger buffer size.")
+            }
+
+            StyledTextLabel {
+                width: parent.width
+                horizontalAlignment: Text.AlignLeft
+                font: ui.theme.bodyBoldFont
+                text: qsTrc("appshell", "Presentation window")
+            }
+
+            StyledTextLabel {
+                width: parent.width
+                horizontalAlignment: Text.AlignLeft
+                text: qsTrc("appshell", "Maximum staff height (% of window height)")
+            }
+
+            Row {
+                width: parent.width
+                spacing: prv.spacing
+
+                IncrementalPropertyControl {
+                    id: maxStaffHeightControl
+
+                    width: 140
+                    height: prv.touchSize
+
+                    currentValue: presentationModel.maxStaffHeightPercent
+                    minValue: presentationModel.minPercent
+                    maxValue: presentationModel.maxPercent
+                    step: 1
+                    decimals: 1
+                    measureUnitsSymbol: "%"
+
+                    navigation.name: "MaxStaffHeightControl"
+                    navigation.panel: navPanel
+                    navigation.order: 4
+
+                    onValueEdited: function(newValue) {
+                        presentationModel.maxStaffHeightPercent = newValue
+                    }
+                }
+
+                FlatButton {
+                    height: prv.touchSize
+
+                    text: qsTrc("appshell", "Reset")
+
+                    navigation.name: "MaxStaffHeightReset"
+                    navigation.panel: navPanel
+                    navigation.order: 5
+
+                    onClicked: {
+                        presentationModel.resetMaxStaffHeight()
+                    }
+                }
+            }
+
+            StyledTextLabel {
+                width: parent.width
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                text: qsTrc("appshell", "A score with fewer staves is not enlarged beyond this size; the rest stays blank.")
             }
 
             FlatButton {

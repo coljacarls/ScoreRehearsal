@@ -35,6 +35,9 @@ qt_add_qml_module(appshell_qml
         mainwindowtitleprovider.h
         presentationpaintview.cpp
         presentationpaintview.h
+        presentationsettings.h
+        presentationsettingsmodel.cpp
+        presentationsettingsmodel.h
         rehearsalmixermodel.cpp
         rehearsalmixermodel.h
         rehearsalpagemodel.cpp

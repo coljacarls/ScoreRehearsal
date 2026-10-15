@@ -42,6 +42,8 @@
 #include "notationscene/qml/MuseScore/NotationScene/continuouspanel.h"
 #include "notationscene/qml/MuseScore/NotationScene/playbackcursor.h"
 
+#include "presentationsettings.h"
+
 #include "log.h"
 
 using namespace mu::appshell;
@@ -146,6 +148,7 @@ void PresentationPaintView::onLoadNotation(INotationPtr notation)
     }
 
     m_cursor->setNotation(notation);
+    m_staffCountDirty = true;
 
     //! The sticky panel is rendered by this view as well (not painted by the base class)
     if (!m_panel) {
@@ -169,12 +172,22 @@ void PresentationPaintView::onLoadNotation(INotationPtr notation)
 
     //! The rendered score is outdated when the content or the colors change
     notation->notationChanged().onReceive(&m_subscriptions, [this](const RectF&) {
+        m_staffCountDirty = true;
         scheduleRebuild(REBUILD_DELAY_MS);
     }, async::Asyncable::Mode::SetReplace);
 
     const auto rebuild = [this]() {
         scheduleRebuild(REBUILD_DELAY_MS);
     };
+
+    //! The scaling changes with the maximum staff size
+    settings()->valueChanged(maxStaffHeightKey()).onReceive(&m_subscriptions, [this](const Val&) {
+        if (m_lastCursorRect.isValid()) {
+            alignToCursor(m_lastCursorRect);
+        }
+
+        scheduleRebuild(REBUILD_DELAY_MS);
+    }, async::Asyncable::Mode::SetReplace);
 
     notationConfig()->foregroundChanged().onNotify(&m_subscriptions, rebuild, async::Asyncable::Mode::SetReplace);
     notationConfig()->backgroundChanged().onNotify(&m_subscriptions, rebuild, async::Asyncable::Mode::SetReplace);
@@ -189,6 +202,7 @@ void PresentationPaintView::onUnloadNotation(INotationPtr notation)
     globalContext()->playbackState()->playbackPositionChanged().disconnect(&m_subscriptions);
     globalContext()->playbackState()->playbackStatusChanged().disconnect(&m_subscriptions);
     notation->notationChanged().disconnect(&m_subscriptions);
+    settings()->valueChanged(maxStaffHeightKey()).disconnect(&m_subscriptions);
     notationConfig()->foregroundChanged().disconnect(&m_subscriptions);
     notationConfig()->backgroundChanged().disconnect(&m_subscriptions);
     notationConfig()->notationColorChanged().disconnect(&m_subscriptions);
@@ -345,7 +359,17 @@ void PresentationPaintView::alignToCursor(const RectF& cursorRect)
     //! The cursor spans the system: this is the part of the score that has to fit into the window height
     const qreal systemHeight = cursorRect.height() * (1.0 + 2 * VERTICAL_MARGIN_RATIO);
     if (systemHeight > 0) {
-        setScaling(height() / systemHeight, PointF());
+        qreal scaling = height() / systemHeight;
+
+        //! A staff is not enlarged beyond the set share of the window height: a score with a single
+        //! staff gets white space above and below instead of notes that are too large
+        const int staves = visibleStaffCount();
+        if (staves > 0) {
+            const qreal staffHeight = cursorRect.height() / staves;
+            scaling = std::min(scaling, maxStaffHeightPercent() / 100.0 * height() / staffHeight);
+        }
+
+        setScaling(scaling, PointF());
     }
 
     //! The tiles are rendered for this vertical position: as soon as it is known, they can be made
@@ -366,6 +390,33 @@ void PresentationPaintView::alignToCursor(const RectF& cursorRect)
 
     moveCanvasToPosition(PointF(left, top));
     updatePlayhead(cursorRect);
+}
+
+int PresentationPaintView::visibleStaffCount()
+{
+    //! The layout can be redone (another part, another system) without a change notification
+    const engraving::Score* current = notation() ? notation()->elements()->msScore() : nullptr;
+    const engraving::System* currentSystem = current && !current->systems().empty() ? current->systems().front() : nullptr;
+    if (currentSystem != m_countedSystem) {
+        m_countedSystem = currentSystem;
+        m_staffCountDirty = true;
+    }
+
+    if (m_staffCountDirty) {
+        m_staffCountDirty = false;
+        m_visibleStaffCount = 0;
+
+        const engraving::Score* score = notation() ? notation()->elements()->msScore() : nullptr;
+        if (score && !score->systems().empty()) {
+            for (const engraving::SysStaff* staff : score->systems().front()->staves()) {
+                if (staff->show()) {
+                    ++m_visibleStaffCount;
+                }
+            }
+        }
+    }
+
+    return m_visibleStaffCount;
 }
 
 void PresentationPaintView::updatePlayhead(const RectF& cursorRect)

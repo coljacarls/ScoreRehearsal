@@ -105,6 +105,9 @@ private:
     void alignToCursor(const muse::RectF& cursorRect);
     void updatePlayhead(const muse::RectF& cursorRect);
 
+    //! Number of staves in the system that are shown (hidden ones take no room)
+    int visibleStaffCount();
+
     //! Width of about one measure (in logical units)
     qreal measureWidth() const;
 
@@ -146,6 +149,9 @@ private:
     muse::async::Asyncable m_subscriptions;
 
     muse::RectF m_lastCursorRect;
+    int m_visibleStaffCount = 0;
+    const void* m_countedSystem = nullptr;
+    bool m_staffCountDirty = true;
     QRectF m_playheadRect;
 
     //! Vertical extent of the system (in logical units), known after the first cursor position
