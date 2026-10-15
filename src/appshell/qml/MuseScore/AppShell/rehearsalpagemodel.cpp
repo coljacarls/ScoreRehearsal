@@ -60,6 +60,13 @@ struct RehearsalViewSession {
 };
 
 //! The presentation window is a session-wide state as well (page content and floating bar share it)
+//! The laser pointer mode (taps highlight instead of seeking) only exists while the presentation window is open
+bool& laserPointerFlag()
+{
+    static bool s_active = false;
+    return s_active;
+}
+
 bool& presentationWindowOpenFlag()
 {
     static bool s_open = false;
@@ -140,6 +147,7 @@ void RehearsalPageModel::load()
     sessionChangedNotification().onNotify(this, [this]() {
         emit isContinuousViewChanged();
         emit isPresentationWindowOpenChanged();
+        emit isLaserPointerActiveChanged();
         emit isTracksPanelVisibleChanged();
     });
 
@@ -371,6 +379,10 @@ void RehearsalPageModel::setIsPresentationWindowOpen(bool open)
     }
 
     presentationWindowOpenFlag() = open;
+    if (!open) {
+        laserPointerFlag() = false;
+    }
+
     sessionChangedNotification().notify();
 }
 
@@ -586,4 +598,20 @@ void RehearsalPageModel::showAbout()
 void RehearsalPageModel::quit()
 {
     dispatcher()->dispatch(APP_QUIT_COMMAND);
+}
+
+bool RehearsalPageModel::isLaserPointerActive() const
+{
+    return presentationWindowOpenFlag() && laserPointerFlag();
+}
+
+void RehearsalPageModel::setIsLaserPointerActive(bool active)
+{
+    active = active && presentationWindowOpenFlag();
+    if (laserPointerFlag() == active) {
+        return;
+    }
+
+    laserPointerFlag() = active;
+    sessionChangedNotification().notify();
 }

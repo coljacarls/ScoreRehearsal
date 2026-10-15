@@ -49,6 +49,12 @@ Window {
 
     visible: true
 
+    //! Laser pointer: highlights an area of the score (logical coordinates) for a moment
+    function highlight(logicRect) {
+        scoreView.setHighlight(logicRect)
+        laser.flash()
+    }
+
     function toggleFullScreen() {
         root.visibility = (root.visibility === Window.FullScreen) ? Window.Windowed : Window.FullScreen
     }
@@ -117,6 +123,12 @@ Window {
                 }
             }
         }
+    }
+
+    LaserHighlight {
+        id: laser
+
+        area: scoreView.highlightRect
     }
 
     QtObject {

@@ -51,6 +51,8 @@ qt_add_qml_module(appshell_qml
         AppWindow.qml
         AudioSettingsDialog.qml
         FaderGroupDialog.qml
+        LaserHighlight.qml
+        LaserPointerButton.qml
         OpenScorePlaceholder.qml
         PresentationWindow.qml
         RehearsalControls.qml

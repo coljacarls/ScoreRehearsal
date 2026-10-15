@@ -168,7 +168,7 @@ Item {
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
-                                - presentationButton.width - partDropdown.width - controls.width - menuButton.width - 96)
+                                - presentationButton.width - (laserButton.visible ? laserButton.width + 4 : 0) - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
@@ -198,6 +198,24 @@ Item {
                     root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
                 }
             }
+
+            LaserPointerButton {
+                id: laserButton
+
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen
+                width: 36
+                height: 36
+
+                active: root.pageModel.isLaserPointerActive
+
+                navigation.panel: topBarLeftNavPanel
+                navigation.order: 3
+
+                onClicked: {
+                    root.pageModel.isLaserPointerActive = !root.pageModel.isLaserPointerActive
+                }
+            }
         }
 
         //! The full score or one of the parts defined in the score
@@ -224,7 +242,7 @@ Item {
             currentIndex: root.pageModel.currentPartIndex + 1
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 3
+            navigation.order: 4
             navigation.accessible.name: qsTrc("appshell", "Part")
 
             onActivated: function(index, value) {
@@ -270,7 +288,7 @@ Item {
             toolTipTitle: qsTrc("appshell", "Menu")
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 4
+            navigation.order: 5
 
             onClicked: {
                 appMenu.toggleOpened([
@@ -345,6 +363,14 @@ Item {
             visible: root.pageModel.hasProject
 
             viewModeOverride: root.pageModel.viewModeOverride
+
+            laserActive: root.pageModel.isLaserPointerActive
+
+            onLaserTapped: function(logicRect) {
+                if (presentationWindowLoader.item) {
+                    presentationWindowLoader.item.highlight(logicRect)
+                }
+            }
 
             anchors.top: parent.top
             anchors.left: parent.left

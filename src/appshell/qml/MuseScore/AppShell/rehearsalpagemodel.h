@@ -55,6 +55,8 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(bool isContinuousView READ isContinuousView WRITE setIsContinuousView NOTIFY isContinuousViewChanged)
     Q_PROPERTY(bool isPresentationWindowOpen READ isPresentationWindowOpen WRITE setIsPresentationWindowOpen
                NOTIFY isPresentationWindowOpenChanged)
+    Q_PROPERTY(bool isLaserPointerActive READ isLaserPointerActive WRITE setIsLaserPointerActive
+               NOTIFY isLaserPointerActiveChanged)
     Q_PROPERTY(int viewModeOverride READ viewModeOverride NOTIFY isContinuousViewChanged)
     Q_PROPERTY(bool isTracksPanelVisible READ isTracksPanelVisible WRITE setIsTracksPanelVisible NOTIFY isTracksPanelVisibleChanged)
     Q_PROPERTY(bool isFullScreen READ isFullScreen NOTIFY isFullScreenChanged)
@@ -95,6 +97,11 @@ public:
     //! not to a single view): while it is open, the rehearsal view stays in the continuous view
     bool isPresentationWindowOpen() const;
     void setIsPresentationWindowOpen(bool open);
+
+    //! Laser pointer mode: a tap highlights the tapped element in both views instead of seeking.
+    //! Only possible while the presentation window is open (closing it ends the mode).
+    bool isLaserPointerActive() const;
+    void setIsLaserPointerActive(bool active);
 
     bool isTracksPanelVisible() const;
     void setIsTracksPanelVisible(bool visible);
@@ -141,6 +148,7 @@ signals:
     void hasProjectChanged();
     void isContinuousViewChanged();
     void isPresentationWindowOpenChanged();
+    void isLaserPointerActiveChanged();
     void isTracksPanelVisibleChanged();
     void isFullScreenChanged();
     void isDarkThemeChanged();
