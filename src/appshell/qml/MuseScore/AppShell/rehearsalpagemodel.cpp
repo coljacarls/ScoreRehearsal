@@ -23,9 +23,14 @@
 
 #include "rehearsalpagemodel.h"
 
+#include <algorithm>
 #include <cmath>
 
+#include <QDir>
+#include <QFileInfo>
+
 #include "actions/actiontypes.h"
+#include "translation.h"
 #include "async/notification.h"
 
 #include "notation/inotation.h"
@@ -35,6 +40,7 @@
 #include "ui/uitypes.h"
 
 #include "appshellcommands.h"
+#include "rehearsalsessionstore.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
@@ -77,7 +83,37 @@ RehearsalViewSession* sessionFor(const INotationProjectPtr& project)
 
     RehearsalViewSession& session = s_sessions.emplace_back();
     session.project = project;
+
+    //! Start from what was stored for the file the last time
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    const RehearsalSession& stored = store.ensureForPath(project->path().toQString(), project->displayName());
+    session.viewMode = stored.continuousView ? ViewMode::LINE : ViewMode::PAGE;
+    session.tracksPanelVisible = stored.tracksPanelVisible;
     return &session;
+}
+}
+
+namespace {
+//! The playhead is restored once per opened project, before that it must not be overwritten
+std::weak_ptr<INotationProject>& playheadRestoredProject()
+{
+    static std::weak_ptr<INotationProject> s_project;
+    return s_project;
+}
+
+void storeSessionState(const RehearsalViewSession& state)
+{
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    const INotationProjectPtr project = state.project.lock();
+    if (!project) {
+        return;
+    }
+
+    if (RehearsalSession* stored = store.findByPath(project->path().toQString())) {
+        stored->continuousView = state.viewMode == ViewMode::LINE;
+        stored->tracksPanelVisible = state.tracksPanelVisible;
+        store.markChanged(stored->id);
+    }
 }
 }
 
@@ -106,6 +142,8 @@ void RehearsalPageModel::load()
             project->displayNameChanged().onNotify(this, [this]() {
                 emit scoreTitleChanged();
             });
+
+            activateSession();
         }
 
         emit hasProjectChanged();
@@ -124,6 +162,11 @@ void RehearsalPageModel::load()
 
     globalContext()->playbackState()->playbackPositionChanged().onReceive(this, [this](audio::secs_t) {
         emit playPositionChanged();
+        savePlayhead();
+    });
+
+    playbackController()->playbackInitedChanged().onReceive(this, [this](bool) {
+        restorePlayhead();
     });
 
     playbackController()->isPlayAllowedChanged().onReceive(this, [this](bool) {
@@ -138,7 +181,61 @@ void RehearsalPageModel::load()
         project->displayNameChanged().onNotify(this, [this]() {
             emit scoreTitleChanged();
         });
+
+        activateSession();
+        restorePlayhead();
     }
+}
+
+void RehearsalPageModel::activateSession()
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    if (!project) {
+        return;
+    }
+
+    //! The first score file opened creates the session; reopening brings it to the top of the list
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    const RehearsalSession& session = store.ensureForPath(project->path().toQString(), project->displayName());
+    store.setTitle(session.id, project->displayName());
+    store.touch(session.id);
+}
+
+void RehearsalPageModel::restorePlayhead()
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    if (!project || !playbackController()->isPlaybackInited() || playheadRestoredProject().lock() == project) {
+        return;
+    }
+
+    playheadRestoredProject() = project;
+
+    const RehearsalSession* session = RehearsalSessionStore::instance().findByPath(project->path().toQString());
+    if (!session || session->playheadMeasureIndex <= 0) {
+        return;
+    }
+
+    //! NOTE The score may have changed since: a measure number beyond the end is moved to the last measure
+    const int lastMeasure = std::max(0, playbackController()->currentBeat().maxMeasureIndex);
+    playbackController()->seekBeat(std::min(session->playheadMeasureIndex, lastMeasure), 0, false);
+}
+
+void RehearsalPageModel::savePlayhead()
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    if (!project || playheadRestoredProject().lock() != project) {
+        return;
+    }
+
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    RehearsalSession* session = store.findByPath(project->path().toQString());
+    const int measureIndex = playbackController()->currentBeat().measureIndex;
+    if (!session || session->playheadMeasureIndex == measureIndex) {
+        return;
+    }
+
+    session->playheadMeasureIndex = measureIndex;
+    store.markChanged(session->id);
 }
 
 bool RehearsalPageModel::hasProject() const
@@ -166,6 +263,7 @@ void RehearsalPageModel::setIsContinuousView(bool continuous)
     }
 
     session->viewMode = mode;
+    storeSessionState(*session);
     sessionChangedNotification().notify();
 }
 
@@ -188,6 +286,7 @@ void RehearsalPageModel::setIsTracksPanelVisible(bool visible)
     }
 
     session->tracksPanelVisible = visible;
+    storeSessionState(*session);
     sessionChangedNotification().notify();
 }
 
@@ -280,6 +379,80 @@ bool RehearsalPageModel::isUrlSupported(const QUrl& url) const
 void RehearsalPageModel::closeScore()
 {
     dispatcher()->dispatch(project::PROJECT_CLOSE_COMMAND);
+}
+
+void RehearsalPageModel::openSession(const QString& sessionId)
+{
+    const RehearsalSession* session = RehearsalSessionStore::instance().findById(sessionId);
+    if (!session) {
+        return;
+    }
+
+    if (!QFileInfo::exists(session->filePath)) {
+        askForMissingFile(sessionId);
+        return;
+    }
+
+    openScoreUrl(QUrl::fromLocalFile(session->filePath));
+}
+
+void RehearsalPageModel::removeSession(const QString& sessionId)
+{
+    RehearsalSessionStore::instance().remove(sessionId);
+}
+
+void RehearsalPageModel::askForMissingFile(const QString& sessionId)
+{
+    const RehearsalSession* session = RehearsalSessionStore::instance().findById(sessionId);
+    if (!session) {
+        return;
+    }
+
+    const int deleteBtn = int(IInteractive::Button::CustomButton) + 1;
+    const int relinkBtn = int(IInteractive::Button::CustomButton) + 2;
+
+    const std::string title = muse::trc("appshell", "The score file cannot be found");
+    const std::string text = muse::qtrc("appshell", "The file of the session \"%1\" was moved or deleted:\n%2")
+                             .arg(session->title, QDir::toNativeSeparators(session->filePath)).toStdString();
+
+    IInteractive::ButtonData cancelBtn = interactive()->buttonData(IInteractive::Button::Cancel);
+
+    interactive()->warning(title, text,
+                           { cancelBtn,
+                             IInteractive::ButtonData(deleteBtn, muse::trc("appshell", "Delete session")),
+                             IInteractive::ButtonData(relinkBtn, muse::trc("appshell", "Locate file…"), true) },
+                           relinkBtn, { IInteractive::Option::WithIcon })
+    .onResolve(this, [this, sessionId, deleteBtn, relinkBtn](const IInteractive::Result& res) {
+        if (res.isButton(deleteBtn)) {
+            removeSession(sessionId);
+        } else if (res.isButton(relinkBtn)) {
+            relinkSession(sessionId);
+        }
+    });
+}
+
+void RehearsalPageModel::relinkSession(const QString& sessionId)
+{
+    const RehearsalSession* session = RehearsalSessionStore::instance().findById(sessionId);
+    if (!session) {
+        return;
+    }
+
+    const QFileInfo oldFile(session->filePath);
+    const muse::io::path_t startDir = QFileInfo::exists(oldFile.absolutePath()) ? oldFile.absolutePath() : QDir::homePath();
+
+    const std::vector<std::string> filter { muse::trc("appshell", "Score files") + " (*.mscz *.mscx)",
+                                            muse::trc("appshell", "All files") + " (*)" };
+
+    interactive()->selectOpeningFile(muse::trc("appshell", "Locate score file"), startDir, filter)
+    .onResolve(this, [this, sessionId](const muse::io::path_t& path) {
+        if (path.empty()) {
+            return;
+        }
+
+        RehearsalSessionStore::instance().relink(sessionId, path.toQString());
+        openSession(sessionId);
+    });
 }
 
 void RehearsalPageModel::showAbout()

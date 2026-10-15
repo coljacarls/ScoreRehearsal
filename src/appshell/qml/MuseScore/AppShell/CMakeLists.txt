@@ -35,6 +35,10 @@ qt_add_qml_module(appshell_qml
         rehearsalmixermodel.h
         rehearsalpagemodel.cpp
         rehearsalpagemodel.h
+        rehearsalsessionlistmodel.cpp
+        rehearsalsessionlistmodel.h
+        rehearsalsessionstore.cpp
+        rehearsalsessionstore.h
     QML_FILES
         AboutDialog.qml
         AppWindow.qml

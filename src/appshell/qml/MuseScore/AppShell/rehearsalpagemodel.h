@@ -113,6 +113,11 @@ public:
     Q_INVOKABLE bool isUrlSupported(const QUrl& url) const;
     Q_INVOKABLE void closeScore();
 
+    //! Opens the score file of a session; if the file is gone, asks to delete the session
+    //! or to link it to the file at its new location
+    Q_INVOKABLE void openSession(const QString& sessionId);
+    Q_INVOKABLE void removeSession(const QString& sessionId);
+
     Q_INVOKABLE void showAbout();
     Q_INVOKABLE void quit();
 
@@ -130,5 +135,12 @@ signals:
 
 private:
     notation::ViewMode sessionViewMode() const;
+
+    //! Creates or finds the stored session of the open score file
+    void activateSession();
+    void restorePlayhead();
+    void askForMissingFile(const QString& sessionId);
+    void relinkSession(const QString& sessionId);
+    void savePlayhead();
 };
 }

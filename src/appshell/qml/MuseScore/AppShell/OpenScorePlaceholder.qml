@@ -27,6 +27,15 @@ Item {
     id: root
 
     signal openRequested()
+    signal openSessionRequested(string sessionId)
+    signal removeSessionRequested(string sessionId)
+
+    //! The files can be moved or deleted while the app is running
+    onVisibleChanged: {
+        if (visible) {
+            sessionsModel.refresh()
+        }
+    }
 
     NavigationPanel {
         id: navPanel
@@ -41,9 +50,13 @@ Item {
         id: aboutModel
     }
 
+    RehearsalSessionListModel {
+        id: sessionsModel
+    }
+
     Column {
         anchors.centerIn: parent
-        width: Math.min(420, parent.width - 48)
+        width: Math.min(480, parent.width - 48)
 
         spacing: 16
 
@@ -84,6 +97,97 @@ Item {
 
             onClicked: {
                 root.openRequested()
+            }
+        }
+
+        StyledTextLabel {
+            width: parent.width
+            visible: sessionsModel.count > 0
+            text: qsTrc("appshell", "Sessions")
+            font: ui.theme.largeBodyBoldFont
+            horizontalAlignment: Text.AlignLeft
+        }
+
+        StyledListView {
+            id: sessionsView
+
+            width: parent.width
+            height: Math.min(contentHeight, 5 * 56)
+            visible: sessionsModel.count > 0
+
+            model: sessionsModel
+            spacing: 0
+
+            delegate: ListItemBlank {
+                id: sessionItem
+
+                required property int index
+                required property string sessionId
+                required property string title
+                required property string filePath
+                required property bool fileExists
+                required property string lastOpened
+
+                height: 56
+                width: sessionsView.width
+
+                navigation.panel: navPanel
+                navigation.order: 2 + index * 2
+                navigation.accessible.name: title
+
+                onClicked: {
+                    root.openSessionRequested(sessionId)
+                }
+
+                Column {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 12
+                    anchors.right: removeButton.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    StyledTextLabel {
+                        width: parent.width
+                        text: sessionItem.title
+                        font: ui.theme.bodyBoldFont
+                        horizontalAlignment: Text.AlignLeft
+                        elide: Text.ElideRight
+                        opacity: sessionItem.fileExists ? 1.0 : 0.6
+                    }
+
+                    StyledTextLabel {
+                        width: parent.width
+                        text: sessionItem.fileExists
+                              ? sessionItem.lastOpened
+                              : qsTrc("appshell", "File not found: %1").arg(sessionItem.filePath)
+                        horizontalAlignment: Text.AlignLeft
+                        elide: Text.ElideMiddle
+                        opacity: 0.6
+                    }
+                }
+
+                FlatButton {
+                    id: removeButton
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 36
+                    height: 36
+
+                    icon: IconCode.DELETE_TANK
+                    transparent: true
+
+                    toolTipTitle: qsTrc("appshell", "Delete session")
+
+                    navigation.panel: navPanel
+                    navigation.order: 3 + sessionItem.index * 2
+                    navigation.accessible.name: qsTrc("appshell", "Delete session %1").arg(sessionItem.title)
+
+                    onClicked: {
+                        root.removeSessionRequested(sessionItem.sessionId)
+                    }
+                }
             }
         }
     }
