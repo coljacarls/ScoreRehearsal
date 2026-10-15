@@ -31,6 +31,8 @@ qt_add_qml_module(appshell_qml
         fadergroups.h
         mainwindowtitleprovider.cpp
         mainwindowtitleprovider.h
+        presentationpaintview.cpp
+        presentationpaintview.h
         rehearsalmixermodel.cpp
         rehearsalmixermodel.h
         rehearsalpagemodel.cpp
@@ -44,6 +46,7 @@ qt_add_qml_module(appshell_qml
         AppWindow.qml
         FaderGroupDialog.qml
         OpenScorePlaceholder.qml
+        PresentationWindow.qml
         RehearsalControls.qml
         RehearsalMixerPanel.qml
         RehearsalNotationView.qml

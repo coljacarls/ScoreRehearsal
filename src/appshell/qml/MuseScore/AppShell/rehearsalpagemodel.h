@@ -52,6 +52,8 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
 
     Q_PROPERTY(bool hasProject READ hasProject NOTIFY hasProjectChanged)
     Q_PROPERTY(bool isContinuousView READ isContinuousView WRITE setIsContinuousView NOTIFY isContinuousViewChanged)
+    Q_PROPERTY(bool isPresentationWindowOpen READ isPresentationWindowOpen WRITE setIsPresentationWindowOpen
+               NOTIFY isPresentationWindowOpenChanged)
     Q_PROPERTY(int viewModeOverride READ viewModeOverride NOTIFY isContinuousViewChanged)
     Q_PROPERTY(bool isTracksPanelVisible READ isTracksPanelVisible WRITE setIsTracksPanelVisible NOTIFY isTracksPanelVisibleChanged)
     Q_PROPERTY(bool isFullScreen READ isFullScreen NOTIFY isFullScreenChanged)
@@ -85,6 +87,11 @@ public:
     bool isContinuousView() const;
     void setIsContinuousView(bool continuous);
     int viewModeOverride() const;
+
+    //! The presentation window needs the continuous view (the view mode belongs to the score,
+    //! not to a single view): while it is open, the rehearsal view stays in the continuous view
+    bool isPresentationWindowOpen() const;
+    void setIsPresentationWindowOpen(bool open);
 
     bool isTracksPanelVisible() const;
     void setIsTracksPanelVisible(bool visible);
@@ -124,6 +131,7 @@ public:
 signals:
     void hasProjectChanged();
     void isContinuousViewChanged();
+    void isPresentationWindowOpenChanged();
     void isTracksPanelVisibleChanged();
     void isFullScreenChanged();
     void isDarkThemeChanged();

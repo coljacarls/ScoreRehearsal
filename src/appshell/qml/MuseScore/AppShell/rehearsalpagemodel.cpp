@@ -56,6 +56,13 @@ struct RehearsalViewSession {
     bool tracksPanelVisible = true;
 };
 
+//! The presentation window is a session-wide state as well (page content and floating bar share it)
+bool& presentationWindowOpenFlag()
+{
+    static bool s_open = false;
+    return s_open;
+}
+
 //! Notifies all live model instances (page content, floating bar)
 //! that the session state has changed
 muse::async::Notification& sessionChangedNotification()
@@ -127,6 +134,7 @@ void RehearsalPageModel::load()
 {
     sessionChangedNotification().onNotify(this, [this]() {
         emit isContinuousViewChanged();
+        emit isPresentationWindowOpenChanged();
         emit isTracksPanelVisibleChanged();
     });
 
@@ -145,6 +153,9 @@ void RehearsalPageModel::load()
             });
 
             activateSession();
+        } else {
+            //! The window shows the score of the project: it closes with it
+            setIsPresentationWindowOpen(false);
         }
 
         emit hasProjectChanged();
@@ -252,14 +263,29 @@ ViewMode RehearsalPageModel::sessionViewMode() const
 
 bool RehearsalPageModel::isContinuousView() const
 {
-    return sessionViewMode() == ViewMode::LINE;
+    return presentationWindowOpenFlag() || sessionViewMode() == ViewMode::LINE;
+}
+
+bool RehearsalPageModel::isPresentationWindowOpen() const
+{
+    return presentationWindowOpenFlag();
+}
+
+void RehearsalPageModel::setIsPresentationWindowOpen(bool open)
+{
+    if (presentationWindowOpenFlag() == open) {
+        return;
+    }
+
+    presentationWindowOpenFlag() = open;
+    sessionChangedNotification().notify();
 }
 
 void RehearsalPageModel::setIsContinuousView(bool continuous)
 {
     RehearsalViewSession* session = sessionFor(globalContext()->currentProject());
     const ViewMode mode = continuous ? ViewMode::LINE : ViewMode::PAGE;
-    if (!session || session->viewMode == mode) {
+    if (!session || session->viewMode == mode || (presentationWindowOpenFlag() && !continuous)) {
         return;
     }
 
@@ -270,7 +296,7 @@ void RehearsalPageModel::setIsContinuousView(bool continuous)
 
 int RehearsalPageModel::viewModeOverride() const
 {
-    return static_cast<int>(sessionViewMode());
+    return static_cast<int>(presentationWindowOpenFlag() ? ViewMode::LINE : sessionViewMode());
 }
 
 bool RehearsalPageModel::isTracksPanelVisible() const
