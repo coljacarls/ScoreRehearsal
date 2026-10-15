@@ -32,8 +32,9 @@ Item {
     property rect area: Qt.rect(0, 0, 0, 0)
     property bool shown: false
 
-    readonly property real padding: 8
-    readonly property real lineWidth: 3.5
+    //! The line lies on the border of the area (half of it outside, half inside)
+    readonly property real padding: lineWidth / 2
+    readonly property real lineWidth: 4
     readonly property real cornerRadius: 8
     readonly property int rotationDuration: 2400
     readonly property int fadeDuration: 250
@@ -111,17 +112,52 @@ Item {
         }
     }
 
-    //! The glow: the ring again, blurred, behind it
+    //! The glow: the ring again, blurred, behind it. Only the part outside of the frame is kept,
+    //! so that it radiates away from the framed area and does not tint the notes inside.
     MultiEffect {
-        anchors.fill: ring
+        id: glow
+
+        readonly property real reach: 48
+
+        x: -reach
+        y: -reach
+        width: ring.width + 2 * reach
+        height: ring.height + 2 * reach
         z: -1
 
         source: ring
-        autoPaddingEnabled: true
+        autoPaddingEnabled: false
+        paddingRect: Qt.rect(reach, reach, reach, reach)
         blurEnabled: true
         blurMax: 48
         blur: 1.0
         brightness: 0.1
         saturation: 0.3
+
+        maskEnabled: true
+        maskInverted: true
+        maskSource: glowMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1.0
+    }
+
+    //! The framed area (inside of the line): where there is no glow
+    Item {
+        id: glowMask
+
+        x: glow.x
+        y: glow.y
+        width: glow.width
+        height: glow.height
+        layer.enabled: true
+        visible: false
+
+        Rectangle {
+            x: glow.reach + root.lineWidth
+            y: glow.reach + root.lineWidth
+            width: ring.width - 2 * root.lineWidth
+            height: ring.height - 2 * root.lineWidth
+            radius: Math.max(root.cornerRadius - root.lineWidth, 0)
+        }
     }
 }
