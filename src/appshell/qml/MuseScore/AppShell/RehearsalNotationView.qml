@@ -34,7 +34,7 @@ Item {
     readonly property alias navigationSection: notationView.navigationSection
     property alias viewModeOverride: notationView.viewModeOverride
 
-    //! Laser pointer mode: a tap does not seek but highlights the tapped element (and is reported)
+    //! Laser pointer mode: a tap does not seek but is reported (the page decides what to frame)
     property bool laserActive: false
     signal laserTapped(rect logicRect)
 
@@ -49,9 +49,6 @@ Item {
 
         onTapped: function(logicRect) {
             root.laserTapped(logicRect)
-            root.logicArea = logicRect
-            root.updateViewArea()
-            laser.flash()
         }
 
         //! No score tabs: the app shows a single score and never saves it
@@ -61,6 +58,17 @@ Item {
     //! The highlighted area (logical score coordinates): follows the score when it is moved or zoomed
     property rect logicArea: Qt.rect(0, 0, 0, 0)
     property rect viewArea: Qt.rect(0, 0, 0, 0)
+
+    //! Frames the area until clearHighlight()
+    function highlight(logicRect) {
+        root.logicArea = logicRect
+        root.updateViewArea()
+        laser.shown = true
+    }
+
+    function clearHighlight() {
+        laser.shown = false
+    }
 
     function updateViewArea() {
         const paintView = notationView.paintView
@@ -73,7 +81,7 @@ Item {
         target: notationView.paintView
 
         function onMatrixChanged() {
-            if (laser.visible) {
+            if (laser.shown) {
                 root.updateViewArea()
             }
         }

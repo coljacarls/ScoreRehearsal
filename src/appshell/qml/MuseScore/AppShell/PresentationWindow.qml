@@ -49,10 +49,14 @@ Window {
 
     visible: true
 
-    //! Laser pointer: highlights an area of the score (logical coordinates) for a moment
+    //! Laser pointer: frames an area of the score (logical coordinates) until clearHighlight()
     function highlight(logicRect) {
         scoreView.setHighlight(logicRect)
-        laser.flash()
+        laser.shown = true
+    }
+
+    function clearHighlight() {
+        laser.shown = false
     }
 
     function toggleFullScreen() {

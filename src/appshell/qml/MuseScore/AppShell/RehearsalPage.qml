@@ -69,6 +69,9 @@ Item {
         property bool immersive: false
         property bool fullScreenSetByImmersive: false
 
+        //! Laser pointer: whether a frame is shown (in both views)
+        property bool laserFrameShown: false
+
         //! Where the presentation window was the last time (e.g. on the second screen)
         property rect presentationGeometry: Qt.rect(100, 100, 1280, 360)
     }
@@ -367,8 +370,15 @@ Item {
             laserActive: root.pageModel.isLaserPointerActive
 
             onLaserTapped: function(logicRect) {
-                if (presentationWindowLoader.item) {
-                    presentationWindowLoader.item.highlight(logicRect)
+                //! A tap removes the frame if there is one, otherwise it creates a new frame where it hit
+                if (prv.laserFrameShown) {
+                    root.clearLaserFrame()
+                } else {
+                    prv.laserFrameShown = true
+                    notationView.highlight(logicRect)
+                    if (presentationWindowLoader.item) {
+                        presentationWindowLoader.item.highlight(logicRect)
+                    }
                 }
             }
 
@@ -439,6 +449,24 @@ Item {
                 onToggleImmersiveRequested: {
                     root.setImmersive(!root.immersive)
                 }
+            }
+        }
+    }
+
+    function clearLaserFrame() {
+        prv.laserFrameShown = false
+        notationView.clearHighlight()
+        if (presentationWindowLoader.item) {
+            presentationWindowLoader.item.clearHighlight()
+        }
+    }
+
+    Connections {
+        target: root.pageModel
+
+        function onIsLaserPointerActiveChanged() {
+            if (!root.pageModel.isLaserPointerActive) {
+                root.clearLaserFrame()
             }
         }
     }
