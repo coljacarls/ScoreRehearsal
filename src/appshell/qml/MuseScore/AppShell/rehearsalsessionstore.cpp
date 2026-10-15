@@ -267,6 +267,7 @@ void RehearsalSessionStore::load()
         session.lastOpened = QDateTime::fromString(o.value("lastOpened").toString(), Qt::ISODate);
         session.continuousView = o.value("continuousView").toBool(true);
         session.tracksPanelVisible = o.value("tracksPanelVisible").toBool(true);
+        session.partName = o.value("partName").toString();
         session.playheadMeasureIndex = std::max(0, o.value("playheadMeasureIndex").toInt());
         session.mixer = o.value("mixer").toObject();
 
@@ -291,6 +292,7 @@ void RehearsalSessionStore::save()
         o["lastOpened"] = session.lastOpened.toString(Qt::ISODate);
         o["continuousView"] = session.continuousView;
         o["tracksPanelVisible"] = session.tracksPanelVisible;
+        o["partName"] = session.partName;
         o["playheadMeasureIndex"] = session.playheadMeasureIndex;
         o["mixer"] = session.mixer;
         array.append(o);

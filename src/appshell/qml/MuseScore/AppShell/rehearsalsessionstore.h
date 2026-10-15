@@ -39,6 +39,8 @@ struct RehearsalSession {
 
     bool continuousView = true;
     bool tracksPanelVisible = true;
+    //! Name of the selected part (empty: the full score)
+    QString partName;
 
     //! Position of the playhead; only the numbers are kept (they may not match a changed score any more)
     int playheadMeasureIndex = 0;

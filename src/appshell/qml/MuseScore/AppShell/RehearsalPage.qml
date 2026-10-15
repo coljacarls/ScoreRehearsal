@@ -167,11 +167,68 @@ Item {
 
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0) - controls.width - menuButton.width - 64)
+                width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
+                                - presentationButton.width - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
                 elide: Text.ElideRight
+            }
+
+            FlatButton {
+                id: presentationButton
+
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject
+                width: 36
+                height: 36
+
+                icon: IconCode.OPEN_LINK
+                accentButton: root.pageModel.isPresentationWindowOpen
+                transparent: !root.pageModel.isPresentationWindowOpen
+
+                toolTipTitle: root.pageModel.isPresentationWindowOpen ? qsTrc("appshell", "Close presentation window")
+                                                                      : qsTrc("appshell", "Presentation window")
+                accessible.checked: root.pageModel.isPresentationWindowOpen
+
+                navigation.panel: topBarLeftNavPanel
+                navigation.order: 2
+
+                onClicked: {
+                    root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
+                }
+            }
+        }
+
+        //! The full score or one of the parts defined in the score
+        StyledDropdown {
+            id: partDropdown
+
+            anchors.right: controls.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            width: 200
+            height: 36
+
+            visible: root.pageModel.hasProject
+
+            model: {
+                const items = [{ text: qsTrc("appshell", "Full score"), value: -1 }]
+                const names = root.pageModel.partNames
+                for (let i = 0; i < names.length; ++i) {
+                    items.push({ text: names[i], value: i })
+                }
+                return items
+            }
+
+            currentIndex: root.pageModel.currentPartIndex + 1
+
+            navigation.panel: topBarLeftNavPanel
+            navigation.order: 3
+            navigation.accessible.name: qsTrc("appshell", "Part")
+
+            onActivated: function(index, value) {
+                root.pageModel.selectPart(value)
             }
         }
 
@@ -213,7 +270,7 @@ Item {
             toolTipTitle: qsTrc("appshell", "Menu")
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 2
+            navigation.order: 4
 
             onClicked: {
                 appMenu.toggleOpened([
@@ -345,6 +402,7 @@ Item {
                 pageModel: root.pageModel
 
                 immersive: root.immersive
+                presentationButtonVisible: true
                 buttonSize: 40
                 sidePadding: 12
 

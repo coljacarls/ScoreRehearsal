@@ -24,6 +24,7 @@
 #pragma once
 
 #include <QObject>
+#include <QStringList>
 #include <QUrl>
 #include <qqmlintegration.h>
 
@@ -58,6 +59,8 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(bool isTracksPanelVisible READ isTracksPanelVisible WRITE setIsTracksPanelVisible NOTIFY isTracksPanelVisibleChanged)
     Q_PROPERTY(bool isFullScreen READ isFullScreen NOTIFY isFullScreenChanged)
     Q_PROPERTY(bool isDarkTheme READ isDarkTheme NOTIFY isDarkThemeChanged)
+    Q_PROPERTY(QStringList partNames READ partNames NOTIFY partsChanged)
+    Q_PROPERTY(int currentPartIndex READ currentPartIndex NOTIFY currentPartChanged)
     Q_PROPERTY(QString scoreTitle READ scoreTitle NOTIFY scoreTitleChanged)
     Q_PROPERTY(bool isPlaying READ isPlaying NOTIFY isPlayingChanged)
     Q_PROPERTY(bool isPlayAllowed READ isPlayAllowed NOTIFY isPlayAllowedChanged)
@@ -102,6 +105,12 @@ public:
     bool isDarkTheme() const;
     Q_INVOKABLE void setDarkTheme(bool dark);
 
+    //! The parts (excerpts) defined in the score; the full score is not in the list
+    QStringList partNames() const;
+    //! Index in partNames(), -1: the full score
+    int currentPartIndex() const;
+    Q_INVOKABLE void selectPart(int index);
+
     QString scoreTitle() const;
     bool isPlaying() const;
     bool isPlayAllowed() const;
@@ -136,6 +145,8 @@ signals:
     void isFullScreenChanged();
     void isDarkThemeChanged();
     void scoreTitleChanged();
+    void partsChanged();
+    void currentPartChanged();
     void isPlayingChanged();
     void isPlayAllowedChanged();
     void isMetronomeEnabledChanged();
@@ -147,6 +158,8 @@ private:
     //! Creates or finds the stored session of the open score file
     void activateSession();
     void restorePlayhead();
+    void restorePart();
+    void subscribeToParts();
     void askForMissingFile(const QString& sessionId);
     void relinkSession(const QString& sessionId);
     void savePlayhead();
