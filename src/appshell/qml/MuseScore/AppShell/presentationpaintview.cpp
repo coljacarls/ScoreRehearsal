@@ -90,6 +90,9 @@ constexpr qreal LIT_GROWTH = 0.60;
 //! Space around the lit staves that stays lit, in staff spaces
 constexpr qreal LIT_MARGIN_SPACES = 1.5;
 
+//! Below the staff there is more room: the lyrics must not end up in the gradient
+constexpr qreal LIT_MARGIN_BOTTOM_SPACES = 5.0;
+
 //! Width of the image of the sticky panel, relative to the width of the view
 constexpr qreal PANEL_IMAGE_WIDTH_RATIO = 0.6;
 
@@ -421,6 +424,7 @@ void PresentationPaintView::updateShadeBands()
     if (score && !m_soloPartIds.isEmpty() && !score->systems().empty() && scaling > 0.0 && height() > 0.0) {
         const engraving::System* system = score->systems().front();
         const qreal margin = LIT_MARGIN_SPACES * score->style().spatium();
+        const qreal marginBottom = LIT_MARGIN_BOTTOM_SPACES * score->style().spatium();
 
         for (const engraving::Part* part : score->parts()) {
             if (!m_soloPartIds.contains(QString::fromStdString(part->id().toStdString()))) {
@@ -434,7 +438,7 @@ void PresentationPaintView::updateShadeBands()
                 }
 
                 const qreal top = system->canvasPos().y() + sysStaff->bbox().top() - margin;
-                const qreal bottom = system->canvasPos().y() + sysStaff->bbox().bottom() + margin;
+                const qreal bottom = system->canvasPos().y() + sysStaff->bbox().bottom() + marginBottom;
                 const qreal topPx = fromLogical(PointF(0.0, top)).y();
                 const qreal bottomPx = fromLogical(PointF(0.0, bottom)).y();
                 const qreal grow = (bottomPx - topPx) * LIT_GROWTH / 2.0;
