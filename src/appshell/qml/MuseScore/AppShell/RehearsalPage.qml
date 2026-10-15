@@ -109,7 +109,7 @@ Item {
         order: 6
     }
 
-    //! Top bar: open / title on the left, the rehearsal controls on the right
+    //! Top bar: back to the start page / title on the left, the rehearsal controls on the right
     Rectangle {
         id: topBar
 
@@ -142,28 +142,29 @@ Item {
             spacing: 8
 
             FlatButton {
-                id: openButton
+                id: homeButton
 
                 anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject
                 height: 36
 
-                icon: IconCode.OPEN_FILE
-                text: qsTrc("appshell", "Open")
+                icon: IconCode.ARROW_LEFT
+                text: qsTrc("appshell", "Home")
                 orientation: Qt.Horizontal
 
-                toolTipTitle: qsTrc("appshell", "Open a MuseScore file (.mscz, .mscx)")
+                toolTipTitle: qsTrc("appshell", "Back to the start page")
 
                 navigation.panel: topBarLeftNavPanel
                 navigation.order: 1
 
                 onClicked: {
-                    root.pageModel.openScore()
+                    root.pageModel.closeScore()
                 }
             }
 
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, topBar.width - leftRow.x - openButton.width - controls.width - menuButton.width - 64)
+                width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0) - controls.width - menuButton.width - 64)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
