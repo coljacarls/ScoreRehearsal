@@ -145,6 +145,7 @@ Item {
                 id: homeButton
 
                 anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject
                 height: 36
 
                 icon: IconCode.ARROW_LEFT
@@ -163,7 +164,7 @@ Item {
 
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, topBar.width - leftRow.x - homeButton.width - controls.width - menuButton.width - 64)
+                width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0) - controls.width - menuButton.width - 64)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
