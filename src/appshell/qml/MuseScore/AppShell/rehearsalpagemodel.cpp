@@ -28,6 +28,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QTimer>
 
 #include "actions/actiontypes.h"
 #include "translation.h"
@@ -426,7 +427,10 @@ void RehearsalPageModel::askForMissingFile(const QString& sessionId)
         if (res.isButton(deleteBtn)) {
             removeSession(sessionId);
         } else if (res.isButton(relinkBtn)) {
-            relinkSession(sessionId);
+            //! NOTE The next dialog can only be opened after this one is closed
+            QTimer::singleShot(0, this, [this, sessionId]() {
+                relinkSession(sessionId);
+            });
         }
     });
 }
