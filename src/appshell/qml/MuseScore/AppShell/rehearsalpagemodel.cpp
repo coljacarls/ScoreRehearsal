@@ -35,6 +35,8 @@
 #include "async/notification.h"
 
 #include "notation/inotation.h"
+#include "notation/imasternotation.h"
+#include "notation/iexcerptnotation.h"
 #include "project/inotationproject.h"
 #include "project/projectcommands.h"
 #include "playback/playbackcommands.h"
@@ -54,6 +56,7 @@ struct RehearsalViewSession {
     std::weak_ptr<INotationProject> project;
     ViewMode viewMode = ViewMode::LINE; // continuous view by default
     bool tracksPanelVisible = true;
+    QString partName; // empty: the full score
 };
 
 //! The presentation window is a session-wide state as well (page content and floating bar share it)
@@ -97,6 +100,7 @@ RehearsalViewSession* sessionFor(const INotationProjectPtr& project)
     const RehearsalSession& stored = store.ensureForPath(project->path().toQString(), project->displayName());
     session.viewMode = stored.continuousView ? ViewMode::LINE : ViewMode::PAGE;
     session.tracksPanelVisible = stored.tracksPanelVisible;
+    session.partName = stored.partName;
     return &session;
 }
 }
@@ -120,6 +124,7 @@ void storeSessionState(const RehearsalViewSession& state)
     if (RehearsalSession* stored = store.findByPath(project->path().toQString())) {
         stored->continuousView = state.viewMode == ViewMode::LINE;
         stored->tracksPanelVisible = state.tracksPanelVisible;
+        stored->partName = state.partName;
         store.markChanged(stored->id);
     }
 }
@@ -153,6 +158,8 @@ void RehearsalPageModel::load()
             });
 
             activateSession();
+            subscribeToParts();
+            restorePart();
         } else {
             //! The window shows the score of the project: it closes with it
             setIsPresentationWindowOpen(false);
@@ -162,10 +169,13 @@ void RehearsalPageModel::load()
         emit isContinuousViewChanged();
         emit isTracksPanelVisibleChanged();
         emit scoreTitleChanged();
+        emit partsChanged();
+        emit currentPartChanged();
     });
 
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         emit scoreTitleChanged();
+        emit currentPartChanged();
     });
 
     globalContext()->playbackState()->playbackStatusChanged().onReceive(this, [this](audio::PlaybackStatus) {
@@ -195,7 +205,90 @@ void RehearsalPageModel::load()
         });
 
         activateSession();
+        subscribeToParts();
+        restorePart();
         restorePlayhead();
+    }
+}
+
+void RehearsalPageModel::subscribeToParts()
+{
+    const IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master) {
+        return;
+    }
+
+    master->excerptsChanged().onNotify(this, [this]() {
+        emit partsChanged();
+        emit currentPartChanged();
+    });
+}
+
+void RehearsalPageModel::restorePart()
+{
+    //! The part selected the last time; a part that no longer exists means the full score
+    const RehearsalViewSession* session = sessionFor(globalContext()->currentProject());
+    if (!session || session->partName.isEmpty()) {
+        return;
+    }
+
+    const QStringList names = partNames();
+    selectPart(static_cast<int>(names.indexOf(session->partName)));
+}
+
+QStringList RehearsalPageModel::partNames() const
+{
+    QStringList names;
+    if (const IMasterNotationPtr master = globalContext()->currentMasterNotation()) {
+        for (const IExcerptNotationPtr& excerpt : master->excerpts()) {
+            names << excerpt->name();
+        }
+    }
+    return names;
+}
+
+int RehearsalPageModel::currentPartIndex() const
+{
+    const IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    const INotationPtr current = globalContext()->currentNotation();
+    if (!master || !current) {
+        return -1;
+    }
+
+    const ExcerptNotationList& excerpts = master->excerpts();
+    for (size_t i = 0; i < excerpts.size(); ++i) {
+        if (excerpts[i]->notation() == current) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+void RehearsalPageModel::selectPart(int index)
+{
+    const IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master) {
+        return;
+    }
+
+    //! The playback always runs on the full score, so the playhead stays where it is: both views
+    //! just show another notation of it
+    const ExcerptNotationList& excerpts = master->excerpts();
+    if (index >= 0 && index < static_cast<int>(excerpts.size())) {
+        const INotationPtr notation = excerpts[index]->notation();
+        master->setExcerptIsOpen(notation, true);
+        globalContext()->setCurrentNotation(notation);
+    } else {
+        index = -1;
+        globalContext()->setCurrentNotation(master->notation());
+    }
+
+    if (RehearsalViewSession* session = sessionFor(globalContext()->currentProject())) {
+        const QString name = index >= 0 ? excerpts[index]->name() : QString();
+        if (session->partName != name) {
+            session->partName = name;
+            storeSessionState(*session);
+        }
     }
 }
 

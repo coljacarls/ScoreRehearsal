@@ -29,7 +29,7 @@ import Muse.UiComponents
 import MuseScore.AppShell
 
 //! Rehearsal controls: to start, play/pause, position, metronome, view mode,
-//! tracks panel toggle, presentation window toggle, fullscreen (immersive) toggle.
+//! tracks panel toggle, (optionally) presentation window toggle, fullscreen (immersive) toggle.
 //! Used in the main tab row and in the floating bar of the immersive mode
 Item {
     id: root
@@ -39,6 +39,9 @@ Item {
     //! Whether the immersive (fullscreen) mode is active
     property bool immersive: false
     signal toggleImmersiveRequested()
+
+    //! The top bar has the presentation window button (next to the title); the floating bar needs it here
+    property bool presentationButtonVisible: false
 
     property NavigationSection navigationSection: null
     property int navigationOrderStart: 1
@@ -223,6 +226,7 @@ Item {
 
         FlatButton {
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.presentationButtonVisible
             width: root.buttonSize
             height: root.buttonSize
 
