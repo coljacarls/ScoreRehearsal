@@ -35,7 +35,7 @@ Item {
     readonly property int fadeDuration: 250
 
     //! The shade of the solo spotlight
-    property color shadeColor: Qt.rgba(0, 0, 0, 0.576)
+    property color shadeColor: Qt.rgba(0, 0, 0, 0.45)
 
     opacity: root.shown ? 1 : 0
     visible: opacity > 0

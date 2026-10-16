@@ -140,7 +140,7 @@ Window {
     QtObject {
         id: prv
 
-        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.576)
+        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.45)
     }
 
     MouseArea {
