@@ -172,6 +172,10 @@ Item {
         }
     }
 
+    ChordScrubber {
+        id: chordScrubber
+    }
+
     NotationView {
         id: notationView
 
@@ -180,6 +184,12 @@ Item {
         readOnly: true
         tapToSeek: true
         reportTaps: root.laserActive
+        //! Press and hold: the playhead follows the finger and the chord at its position sounds
+        reportScrubs: !root.laserActive
+
+        onScrubBegan: function(logicPos) { chordScrubber.begin(logicPos) }
+        onScrubMoved: function(logicPos) { chordScrubber.move(logicPos) }
+        onScrubEnded: chordScrubber.end()
 
         onTapped: function(logicRect) {
             root.laserTapped(logicRect)
