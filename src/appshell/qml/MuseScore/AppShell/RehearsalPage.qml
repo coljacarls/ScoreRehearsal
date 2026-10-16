@@ -371,6 +371,7 @@ Item {
             laserActive: root.pageModel.isLaserPointerActive
             pitchPipeActive: root.pageModel.isPitchPipeActive
             chordScrubActive: root.pageModel.isChordScrubActive
+            shownPartOnly: tracksPanel.mixerModel.partScopeActive
             laserMode: root.pageModel.laserMode
             strokes: root.pageModel.strokes
             liveStroke: prv.laserLiveStroke

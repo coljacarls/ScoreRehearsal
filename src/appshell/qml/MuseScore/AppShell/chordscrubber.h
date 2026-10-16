@@ -47,6 +47,8 @@ class ChordScrubber : public QObject, public muse::Contextable, public muse::asy
     Q_OBJECT
 
     Q_PROPERTY(QVariantList noteRects READ noteRects NOTIFY noteRectsChanged)
+    //! Only the notes that are in the shown part sound (instead of all instruments of the score)
+    Q_PROPERTY(bool shownPartOnly READ shownPartOnly WRITE setShownPartOnly NOTIFY shownPartOnlyChanged)
 
     QML_ELEMENT
 
@@ -59,6 +61,9 @@ public:
 
     QVariantList noteRects() const;
 
+    bool shownPartOnly() const;
+    void setShownPartOnly(bool only);
+
     //! Positions in logical coordinates of the score view
     Q_INVOKABLE void begin(const QPointF& logicPos);
     Q_INVOKABLE void move(const QPointF& logicPos);
@@ -66,6 +71,7 @@ public:
 
 signals:
     void noteRectsChanged();
+    void shownPartOnlyChanged();
 
 private:
     void setNoteRects(const QVariantList& rects);
@@ -74,6 +80,7 @@ private:
 
     bool m_active = false;
     int m_lastTick = -1;
+    bool m_shownPartOnly = false;
     QVariantList m_noteRects;
     engraving::InstrumentTrackIdSet m_soundingTracks;
 };
