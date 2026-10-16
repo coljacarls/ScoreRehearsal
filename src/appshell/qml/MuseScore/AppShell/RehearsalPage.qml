@@ -390,6 +390,10 @@ Item {
                 root.pageModel.clearHighlight()
             }
 
+            onStrokeEdited: function(index, points) {
+                root.pageModel.setStroke(index, points)
+            }
+
             onStrokeDeleteRequested: function(index) {
                 root.pageModel.removeStroke(index)
             }

@@ -119,6 +119,8 @@ public:
     QRectF highlight() const;
     Q_INVOKABLE void addStroke(const QVariantList& points);
     Q_INVOKABLE void removeStroke(int index);
+    //! Replaces the points of a stroke (moved or resized)
+    Q_INVOKABLE void setStroke(int index, const QVariantList& points);
     Q_INVOKABLE void setHighlight(const QRectF& rect);
     Q_INVOKABLE void clearHighlight();
     //! Asks whether to delete all annotations, deletes them on yes

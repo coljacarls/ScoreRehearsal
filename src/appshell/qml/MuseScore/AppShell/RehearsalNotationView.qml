@@ -60,6 +60,7 @@ Item {
     signal highlightEdited(rect logicRect)
     signal highlightDeleteRequested()
     signal strokeDeleteRequested(int index)
+    signal strokeEdited(int index, var points)
 
     //! Select tool: what is selected ("highlight", "stroke" or "")
     property string selectedKind: ""
@@ -113,8 +114,8 @@ Item {
         return best
     }
 
-    function strokeBoundsInView(index) {
-        const stroke = root.strokes[index]
+    //! The box around a stroke (logical coordinates)
+    function strokeBoundsLogical(stroke) {
         if (!stroke || stroke.length === 0) {
             return Qt.rect(0, 0, 0, 0)
         }
@@ -124,13 +125,28 @@ Item {
         let right = -Infinity
         let bottom = -Infinity
         for (const point of stroke) {
-            const p = root.toView(point.x, point.y)
-            left = Math.min(left, p.x)
-            top = Math.min(top, p.y)
-            right = Math.max(right, p.x)
-            bottom = Math.max(bottom, p.y)
+            left = Math.min(left, point.x)
+            top = Math.min(top, point.y)
+            right = Math.max(right, point.x)
+            bottom = Math.max(bottom, point.y)
         }
         return Qt.rect(left, top, right - left, bottom - top)
+    }
+
+    //! The selection in view coordinates: the highlight, or the box around the selected stroke (with some
+    //! margin, so that the handles do not lie on the line)
+    readonly property rect selectionArea: {
+        if (root.selectedKind === "highlight") {
+            return root.areaToView(root.highlight)
+        }
+
+        if (root.selectedKind === "stroke" && root.selectedStroke >= 0 && root.selectedStroke < root.strokes.length) {
+            const area = root.areaToView(root.strokeBoundsLogical(root.strokes[root.selectedStroke]))
+            const margin = 10
+            return Qt.rect(area.x - margin, area.y - margin, area.width + 2 * margin, area.height + 2 * margin)
+        }
+
+        return Qt.rect(0, 0, 0, 0)
     }
 
     function clearSelection() {
@@ -253,14 +269,22 @@ Item {
         onCanceled: penArea.finish()
     }
 
-    //! Select: selects a stroke or the highlight; the corners of the selected highlight can be dragged
+    //! Select: selects a stroke or the highlight. The selection can be moved (drag) and resized (handles in the
+    //! four corners).
     MouseArea {
         id: selectArea
 
-        //! Corner being dragged (0 top left, 1 top right, 2 bottom right, 3 bottom left), -1: none
+        //! What is being dragged: "" (nothing), "move" or "corner"
+        property string drag: ""
+        //! Corner being dragged (0 top left, 1 top right, 2 bottom right, 3 bottom left)
         property int corner: -1
-        //! The opposite corner stays where it is (logical coordinates)
+        //! Logical coordinates: where the drag started, the corner that stays where it is, the grabbed corner
+        property point pressPoint: Qt.point(0, 0)
         property point fixedCorner: Qt.point(0, 0)
+        property point grabbedCorner: Qt.point(0, 0)
+        //! The selection as it was when the drag started
+        property var originalPoints: []
+        property rect originalRect: Qt.rect(0, 0, 0, 0)
 
         anchors.fill: parent
         enabled: root.selecting
@@ -269,21 +293,41 @@ Item {
         preventStealing: true
 
         function cornersInView() {
-            const r = root.areaToView(root.highlight)
+            const r = root.selectionArea
             return [Qt.point(r.x, r.y), Qt.point(r.x + r.width, r.y), Qt.point(r.x + r.width, r.y + r.height),
                     Qt.point(r.x, r.y + r.height)]
         }
 
+        //! The area of the selection in logical coordinates (without the margin of the handles)
+        function logicalArea() {
+            return root.selectedKind === "highlight" ? root.highlight : root.strokeBoundsLogical(root.strokes[root.selectedStroke])
+        }
+
+        function startMove(pos) {
+            selectArea.drag = "move"
+            selectArea.pressPoint = root.toLogical(pos.x, pos.y)
+            selectArea.originalPoints = root.selectedKind === "stroke" ? root.strokes[root.selectedStroke] : []
+            selectArea.originalRect = root.highlight
+        }
+
         onPressed: function(mouse) {
             const pos = Qt.point(mouse.x, mouse.y)
+            selectArea.drag = ""
 
-            if (root.selectedKind === "highlight") {
+            if (root.selectedKind !== "") {
                 const corners = selectArea.cornersInView()
                 for (let i = 0; i < 4; ++i) {
                     if (Math.hypot(pos.x - corners[i].x, pos.y - corners[i].y) <= root.hitDistance + root.handleSize / 2) {
-                        const opposite = corners[(i + 2) % 4]
+                        const area = selectArea.logicalArea()
+                        const logicalCorners = [Qt.point(area.x, area.y), Qt.point(area.x + area.width, area.y),
+                                                Qt.point(area.x + area.width, area.y + area.height), Qt.point(area.x, area.y + area.height)]
+                        selectArea.drag = "corner"
                         selectArea.corner = i
-                        selectArea.fixedCorner = root.toLogical(opposite.x, opposite.y)
+                        selectArea.fixedCorner = logicalCorners[(i + 2) % 4]
+                        selectArea.grabbedCorner = logicalCorners[i]
+                        selectArea.pressPoint = root.toLogical(pos.x, pos.y)
+                        selectArea.originalPoints = root.selectedKind === "stroke" ? root.strokes[root.selectedStroke] : []
+                        selectArea.originalRect = root.highlight
                         return
                     }
                 }
@@ -294,6 +338,16 @@ Item {
                 if (root.distanceToStroke(pos, root.strokes[i]) <= root.hitDistance) {
                     root.selectedKind = "stroke"
                     root.selectedStroke = i
+                    selectArea.startMove(pos)
+                    return
+                }
+            }
+
+            //! Inside of the selected stroke's box
+            if (root.selectedKind === "stroke") {
+                const box = root.selectionArea
+                if (pos.x >= box.x && pos.x <= box.x + box.width && pos.y >= box.y && pos.y <= box.y + box.height) {
+                    selectArea.startMove(pos)
                     return
                 }
             }
@@ -304,6 +358,7 @@ Item {
                     && pos.y >= area.y - 6 && pos.y <= area.y + area.height + 6) {
                     root.selectedKind = "highlight"
                     root.selectedStroke = -1
+                    selectArea.startMove(pos)
                     return
                 }
             }
@@ -312,28 +367,56 @@ Item {
         }
 
         onPositionChanged: function(mouse) {
-            if (selectArea.corner < 0 || !selectArea.pressed) {
+            if (!selectArea.pressed || selectArea.drag === "") {
                 return
             }
 
             const p = root.toLogical(mouse.x, mouse.y)
+
+            if (selectArea.drag === "move") {
+                const dx = p.x - selectArea.pressPoint.x
+                const dy = p.y - selectArea.pressPoint.y
+                if (root.selectedKind === "stroke") {
+                    root.strokeEdited(root.selectedStroke, selectArea.originalPoints.map(q => Qt.point(q.x + dx, q.y + dy)))
+                } else {
+                    const r = selectArea.originalRect
+                    root.highlightEdited(Qt.rect(r.x + dx, r.y + dy, r.width, r.height))
+                }
+                return
+            }
+
+            //! The grabbed corner follows the pointer, the opposite one stays
             const fixed = selectArea.fixedCorner
-            root.highlightEdited(Qt.rect(Math.min(p.x, fixed.x), Math.min(p.y, fixed.y),
-                                         Math.max(Math.abs(p.x - fixed.x), 4), Math.max(Math.abs(p.y - fixed.y), 4)))
+            const grabbed = selectArea.grabbedCorner
+            const target = Qt.point(grabbed.x + p.x - selectArea.pressPoint.x, grabbed.y + p.y - selectArea.pressPoint.y)
+
+            if (root.selectedKind === "highlight") {
+                root.highlightEdited(Qt.rect(Math.min(target.x, fixed.x), Math.min(target.y, fixed.y),
+                                             Math.max(Math.abs(target.x - fixed.x), 4), Math.max(Math.abs(target.y - fixed.y), 4)))
+                return
+            }
+
+            //! A stroke is scaled around the opposite corner of its box
+            const width = grabbed.x - fixed.x
+            const height = grabbed.y - fixed.y
+            const sx = Math.abs(width) < 0.5 ? 1 : Math.max((target.x - fixed.x) / width, 0.05)
+            const sy = Math.abs(height) < 0.5 ? 1 : Math.max((target.y - fixed.y) / height, 0.05)
+            root.strokeEdited(root.selectedStroke, selectArea.originalPoints.map(q => Qt.point(fixed.x + (q.x - fixed.x) * sx,
+                                                                                              fixed.y + (q.y - fixed.y) * sy)))
         }
 
-        onReleased: selectArea.corner = -1
-        onCanceled: selectArea.corner = -1
+        onReleased: selectArea.drag = ""
+        onCanceled: selectArea.drag = ""
     }
 
-    //! The handles at the corners of the selected highlight
+    //! The handles at the corners of the selection
     Repeater {
-        model: root.selecting && root.selectedKind === "highlight" && root.hasHighlight ? 4 : 0
+        model: root.selecting && root.selectedKind !== "" ? 4 : 0
 
         Rectangle {
             required property int index
 
-            readonly property rect area: root.areaToView(root.highlight)
+            readonly property rect area: root.selectionArea
 
             x: (index === 0 || index === 3 ? area.x : area.x + area.width) - width / 2
             y: (index < 2 ? area.y : area.y + area.height) - height / 2
@@ -351,8 +434,7 @@ Item {
     FlatButton {
         id: deleteSelectionButton
 
-        readonly property rect bounds: root.selectedKind === "highlight" ? root.areaToView(root.highlight)
-                                                                         : root.strokeBoundsInView(root.selectedStroke)
+        readonly property rect bounds: root.selectionArea
 
         x: Math.max(0, Math.min(bounds.x + bounds.width + 10, root.width - width))
         y: Math.max(0, Math.min(bounds.y - height - 10, root.height - height))

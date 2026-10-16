@@ -733,6 +733,27 @@ void RehearsalPageModel::addStroke(const QVariantList& points)
     storeAnnotations(project, annotations);
 }
 
+void RehearsalPageModel::setStroke(int index, const QVariantList& points)
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    QJsonObject annotations = currentAnnotations(project);
+    QJsonArray strokes = annotations.value("strokes").toArray();
+    if (!project || index < 0 || index >= strokes.size() || points.size() < 2) {
+        return;
+    }
+
+    QJsonArray numbers;
+    for (const QVariant& point : points) {
+        const QPointF p = point.toPointF();
+        numbers.append(std::round(p.x() * 10.0) / 10.0);
+        numbers.append(std::round(p.y() * 10.0) / 10.0);
+    }
+
+    strokes[index] = numbers;
+    annotations["strokes"] = strokes;
+    storeAnnotations(project, annotations);
+}
+
 void RehearsalPageModel::removeStroke(int index)
 {
     const INotationProjectPtr project = globalContext()->currentProject();
