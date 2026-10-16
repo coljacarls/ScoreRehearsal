@@ -139,7 +139,7 @@ Rectangle {
             minWidth: prv.touchSize
             transparent: true
 
-            icon: root.expanded ? IconCode.ARROW_RIGHT : IconCode.ARROW_LEFT
+            icon: root.expanded ? IconCode.CHEVRON_RIGHT : IconCode.CHEVRON_LEFT
             iconFont: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 24 })
 
             toolTipTitle: root.expanded ? qsTrc("appshell", "Narrow the sidebar") : qsTrc("appshell", "Widen the sidebar")
