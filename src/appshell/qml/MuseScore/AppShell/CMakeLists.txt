@@ -46,6 +46,8 @@ qt_add_qml_module(appshell_qml
         rehearsalsessionlistmodel.h
         rehearsalsessionstore.cpp
         rehearsalsessionstore.h
+        windowstatemodel.cpp
+        windowstatemodel.h
     QML_FILES
         AboutDialog.qml
         AppWindow.qml
