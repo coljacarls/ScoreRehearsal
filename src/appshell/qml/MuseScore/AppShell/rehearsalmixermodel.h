@@ -197,6 +197,9 @@ private:
     float m_accompanimentDb = playback::REHEARSAL_VOLUME_DB_MIN;
     float m_metronomeDb = 0.f;
     float m_metronomeScoreDb = 0.f;
+    //! Whether the groups and faders of the session were loaded: before that (no playback yet) the model is empty
+    //! and must not be written to the session
+    bool m_sessionLoaded = false;
     bool m_hasSolo = false;
     QStringList m_soloPartIds;
     bool m_overrideApplied = false;

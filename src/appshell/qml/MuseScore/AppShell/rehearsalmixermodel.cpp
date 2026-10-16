@@ -776,7 +776,10 @@ void RehearsalMixerModel::reload()
     const INotationProjectPtr project = context()->currentProject();
     float accompanimentDb = REHEARSAL_VOLUME_DB_MIN;
 
+    m_sessionLoaded = false;
+
     if (project && controller()->isPlaybackInited()) {
+        m_sessionLoaded = true;
         const RehearsalMixerSession& session = mixerSessionFor(project);
         accompanimentDb = session.accompanimentDb;
         m_groups = session.groups;
@@ -1115,8 +1118,9 @@ void RehearsalMixerModel::updateHasSolo()
 
 void RehearsalMixerModel::saveSession()
 {
+    //! NOTE An empty model (the playback is not ready yet) would wipe the groups and faders of the session
     const INotationProjectPtr project = context()->currentProject();
-    if (!project) {
+    if (!m_sessionLoaded || !project) {
         return;
     }
 
