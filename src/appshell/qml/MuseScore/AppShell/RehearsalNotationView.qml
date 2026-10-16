@@ -90,6 +90,8 @@ Item {
     LaserHighlight {
         id: laser
 
+        anchors.fill: parent
+
         area: root.viewArea
     }
 }

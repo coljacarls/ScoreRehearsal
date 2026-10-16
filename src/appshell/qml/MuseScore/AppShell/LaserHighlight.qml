@@ -20,8 +20,9 @@
 
 import QtQuick
 
-//! The laser pointer highlight: a solid orange frame around an area of the score (view coordinates).
-//! It stays as long as `shown` is true and fades in and out.
+//! The laser pointer highlight: a solid orange frame around an area of the score, and the rest of the
+//! item (the view it is placed in, fill the parent) is dimmed like the unlit staves of the solo spotlight.
+//! The area is in the coordinates of this item. It stays as long as `shown` is true and fades in and out.
 Item {
     id: root
 
@@ -33,10 +34,8 @@ Item {
     readonly property real lineWidth: 3
     readonly property int fadeDuration: 250
 
-    x: area.x - lineWidth / 2
-    y: area.y - lineWidth / 2
-    width: area.width + lineWidth
-    height: area.height + lineWidth
+    //! The shade of the solo spotlight
+    property color shadeColor: Qt.rgba(0, 0, 0, 0.576)
 
     opacity: root.shown ? 1 : 0
     visible: opacity > 0
@@ -48,8 +47,45 @@ Item {
         }
     }
 
+    //! The shade: four parts around the area, so that it stays clear inside the frame (no gradient)
     Rectangle {
-        anchors.fill: parent
+        x: 0
+        y: 0
+        width: root.width
+        height: Math.max(root.area.y, 0)
+        color: root.shadeColor
+    }
+
+    Rectangle {
+        x: 0
+        y: root.area.y + root.area.height
+        width: root.width
+        height: Math.max(root.height - y, 0)
+        color: root.shadeColor
+    }
+
+    Rectangle {
+        x: 0
+        y: root.area.y
+        width: Math.max(root.area.x, 0)
+        height: root.area.height
+        color: root.shadeColor
+    }
+
+    Rectangle {
+        x: root.area.x + root.area.width
+        y: root.area.y
+        width: Math.max(root.width - x, 0)
+        height: root.area.height
+        color: root.shadeColor
+    }
+
+    //! The frame, above the shade
+    Rectangle {
+        x: root.area.x - root.lineWidth / 2
+        y: root.area.y - root.lineWidth / 2
+        width: root.area.width + root.lineWidth
+        height: root.area.height + root.lineWidth
 
         color: "transparent"
         border.width: root.lineWidth

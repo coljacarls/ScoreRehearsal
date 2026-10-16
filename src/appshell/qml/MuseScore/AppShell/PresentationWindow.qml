@@ -132,13 +132,15 @@ Window {
     LaserHighlight {
         id: laser
 
+        anchors.fill: parent
+
         area: scoreView.highlightRect
     }
 
     QtObject {
         id: prv
 
-        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.72)
+        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.576)
     }
 
     MouseArea {
