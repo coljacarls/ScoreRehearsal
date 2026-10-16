@@ -3,7 +3,7 @@
 **Your MuseScore scores, ready for rehearsal. Tap, play, sing.**
 
 You wrote the arrangement in MuseScore. Now the choir is waiting, you're sitting next to your
-laptop or tablet, and everything has to happen *fast*: "Altos, from bar 17 please!" – "Once more,
+laptop or tablet, and everything has to happen _fast_: "Altos, from bar 17 please!" – "Once more,
 just the men!" – "What's our starting note?"
 
 ScoreRehearsal is made for exactly this moment. It opens your MuseScore files (`.mscz`, `.mscx`)
@@ -61,7 +61,7 @@ like, ScoreRehearsal plays only the voices of that part, too.
   <img src="docs/img/playback-all-voices-from-score.png" alt="Playing only the voices of the shown part" width="420">
 </p>
 
-### Find the starting note – or the chord *(new in 1.1)*
+### Find the starting note – or the chord _(new in 1.1)_
 
 Two little helpers sit at the bottom right of the score:
 
@@ -77,7 +77,7 @@ A small hand shows you which notes are sounding right now.
   <img src="docs/img/playback-chords-scrub.png" alt="Chord scrubbing: every sounding note is marked with a hand" width="180">
 </p>
 
-### Point, mark and draw *(new in 1.1)*
+### Point, mark and draw _(new in 1.1)_
 
 "Look here, everybody!" The laser pointer frames a spot in the score and dims everything else.
 With the pen you can draw arrows and circles right on the score, just like on a whiteboard. Your
@@ -88,7 +88,7 @@ markings are kept with the rehearsal, never in the score file itself.
   <img src="docs/img/annotations.png" alt="A hand-drawn arrow on the score" width="430">
 </p>
 
-### The big screen for your singers *(new in 1.1)*
+### The big screen for your singers _(new in 1.1)_
 
 Open the presentation window on a projector or TV and the whole group can read along. The score
 scrolls by like karaoke, the playhead stays in place, and your drawings show up there too.
@@ -116,7 +116,7 @@ The first time you start ScoreRehearsal, Windows will most likely show you this 
 
 <img src="docs/img/warning.png" alt="Microsoft Defender SmartScreen: Windows protected your PC" width="420">
 
-**What's behind it:** Windows warns about every app that is not *digitally signed* and that it
+**What's behind it:** Windows warns about every app that is not _digitally signed_ and that it
 hasn't seen on many PCs yet. A signature is a kind of ID card for software: a certificate that
 confirms who published the app. ScoreRehearsal doesn't have one (yet), so Windows simply doesn't
 know who I am. The warning says nothing about the app being harmful – and since the whole source
@@ -146,17 +146,19 @@ Curious how it works under the hood or want to build it yourself? Have a look at
 [developer notes](docs/DEVELOPMENT.md).
 
 ## About me and the "why"
+
 I am a 40-something year old family father with a background in computer science and usability.
-I LOVE music, love arranging it and in MuseScore I found my go-to-software, especially since the
-overhaul led by Martin Keary (aka. Tantacrul). Thanks for making MuseScore a no-brainer with
+I LOVE music, love arranging it and in MuseScore I found my go-to-software, especially since [the
+overhaul led by Martin Keary (aka. Tantacrul)](https://www.martinkeary.com/#/musescore-4/). Thanks for making MuseScore a no-brainer with
 premium usability!
 
-In my spare-time I often take the role of a conductor for vocal groups. Because I s*ck at playing
+In my spare-time I often take the role of a conductor for vocal groups. Because I s\*ck at playing
 the piano I tend to use the playback function of MuseScore to play the score, set the focus on
 single voices, scrub through the chords to help the group find their place in the harmony.
 Unfortunately MuseScore has no focus on tablets (yet) and opening a score and using it for the
 porposes of the rehursal sometimes messes up the score. Everything needs to happen fast to keep
 the drive in a rehursal:
+
 - switching the playback between single voices
 - starting the playback at selected measures or beats
 - mixing the volume levels for certain voices in focus with "the rest"
