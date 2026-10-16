@@ -47,6 +47,8 @@ Item {
     property bool pitchPipeActive: false
     //! Chord scrubbing instead of the hand: the chord at the finger sounds, the playhead does not move
     property bool chordScrubActive: false
+    //! Chord scrubbing plays only the voices of the shown part (not all instruments of the score)
+    property bool shownPartOnly: false
     //! The areas of the sounding notes (logical score coordinates) that the views point at with a hand
     readonly property var soundingRects: root.pitchPipeActive ? (pitchPipe.sounding ? [pitchPipe.noteRect] : [])
                                                               : chordScrubber.noteRects
@@ -181,6 +183,8 @@ Item {
 
     ChordScrubber {
         id: chordScrubber
+
+        shownPartOnly: root.shownPartOnly
     }
 
     PitchPipe {

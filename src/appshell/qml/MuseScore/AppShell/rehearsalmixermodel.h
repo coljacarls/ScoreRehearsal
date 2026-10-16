@@ -63,6 +63,12 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_PROPERTY(float minVolumeDb READ minVolumeDb CONSTANT)
     Q_PROPERTY(float maxVolumeDb READ maxVolumeDb CONSTANT)
     Q_PROPERTY(int ungroupedTrackCount READ ungroupedTrackCount NOTIFY structureChanged)
+    //! A part (not the full score) is shown
+    Q_PROPERTY(bool isPartShown READ isPartShown NOTIFY scopeChanged)
+    //! Only the tracks of the shown part are played and have faders (otherwise all tracks of the score)
+    Q_PROPERTY(bool shownPartOnly READ shownPartOnly WRITE setShownPartOnly NOTIFY scopeChanged)
+    //! Whether the tracks are limited to the ones of the shown part right now (a part is shown and shownPartOnly)
+    Q_PROPERTY(bool partScopeActive READ partScopeActive NOTIFY scopeChanged)
 
     QML_ELEMENT
 
@@ -113,6 +119,11 @@ public:
 
     int ungroupedTrackCount() const;
 
+    bool isPartShown() const;
+    bool shownPartOnly() const;
+    void setShownPartOnly(bool only);
+    bool partScopeActive() const;
+
     Q_INVOKABLE void setOn(int row, bool on);
     Q_INVOKABLE void setSolo(int row, bool solo);
     Q_INVOKABLE void setVolumeDb(int row, float db);
@@ -133,6 +144,7 @@ signals:
     void accompanimentDbChanged();
     void metronomeDbChanged();
     void structureChanged();
+    void scopeChanged();
 
 private:
     struct Track {
@@ -170,6 +182,12 @@ private:
     int groupIndexOfTrack(const engraving::InstrumentTrackId& instrumentTrackId) const;
     bool isValidRow(int row) const;
 
+    //! Whether the track is played and shown with the current scope (see partScopeActive)
+    bool isInScope(const engraving::InstrumentTrackId& instrumentTrackId) const;
+    //! Reads which part is shown; returns whether that changed
+    bool readShownPart();
+    void updateScope();
+
     //! Rebuilds the row list from tracks and groups (resets the model)
     void rebuildRows();
     std::vector<Row> buildRows() const;
@@ -203,5 +221,9 @@ private:
     bool m_hasSolo = false;
     QStringList m_soloPartIds;
     bool m_overrideApplied = false;
+
+    bool m_isPartShown = false;
+    bool m_shownPartOnly = false;
+    std::vector<muse::ID> m_shownPartIds;
 };
 }

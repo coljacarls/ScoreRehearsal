@@ -304,10 +304,58 @@ Rectangle {
         }
     }
 
+    //! While a part is shown: whether the whole score is played or only the voices of the part. The faders follow.
+    Item {
+        id: scopeRow
+
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: prv.margins
+        anchors.rightMargin: prv.margins
+
+        height: visible ? prv.touchSize + prv.cardSpacing : 0
+        visible: mixer.isPartShown
+
+        FlatButton {
+            id: scopeButton
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+
+            height: prv.touchSize
+
+            accentButton: mixer.shownPartOnly
+
+            //! The label of the button itself is cut ("Playing: whole s...") when it changes: it is shown by an item of its own
+            contentItem: Component {
+                StyledTextLabel {
+                    text: mixer.shownPartOnly ? qsTrc("appshell", "Playing: shown part only") : qsTrc("appshell", "Playing: whole score")
+                    font: ui.theme.bodyFont
+                    color: mixer.shownPartOnly ? "white" : ui.theme.fontPrimaryColor
+                }
+            }
+
+            toolTipTitle: qsTrc("appshell", "Voices to play")
+            toolTipDescription: mixer.shownPartOnly ? qsTrc("appshell", "Only the voices of the shown part are heard. Tap to play the whole score.")
+                                                    : qsTrc("appshell", "All voices of the score are heard. Tap to play only the voices of the shown part.")
+            accessible.checked: mixer.shownPartOnly
+
+            navigation.name: "PlaybackScopeButton"
+            navigation.panel: headerNavPanel
+            navigation.order: 3
+
+            onClicked: {
+                mixer.shownPartOnly = !mixer.shownPartOnly
+            }
+        }
+    }
+
     StyledFlickable {
         id: flickable
 
-        anchors.top: header.bottom
+        anchors.top: scopeRow.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: accompanimentRow.visible ? accompanimentRow.top : parent.bottom

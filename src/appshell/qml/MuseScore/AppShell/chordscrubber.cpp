@@ -74,6 +74,22 @@ ChordScrubber::~ChordScrubber()
     }
 }
 
+bool ChordScrubber::shownPartOnly() const
+{
+    return m_shownPartOnly;
+}
+
+void ChordScrubber::setShownPartOnly(bool only)
+{
+    if (m_shownPartOnly == only) {
+        return;
+    }
+
+    m_shownPartOnly = only;
+    m_lastTick = -1;
+    emit shownPartOnlyChanged();
+}
+
 QVariantList ChordScrubber::noteRects() const
 {
     return m_noteRects;
@@ -157,10 +173,16 @@ void ChordScrubber::playAt(const QPointF& logicPos)
                 continue;
             }
 
+            //! A part shows only some of the instruments of the score
+            const Note* shown = linkedNoteIn(note, shownScore);
+            if (m_shownPartOnly && !shown) {
+                continue;
+            }
+
             notesByTrack[makeInstrumentTrackId(start)].push_back(start);
 
-            //! Pointed at in the shown score, if the note is in it (a part shows only some of the instruments)
-            if (const Note* shown = linkedNoteIn(note, shownScore)) {
+            //! Pointed at in the shown score, if the note is in it
+            if (shown) {
                 rects.push_back(shown->canvasBoundingRect().toQRectF());
             }
         }
