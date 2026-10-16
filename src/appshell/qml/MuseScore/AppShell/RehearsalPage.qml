@@ -422,9 +422,14 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
 
-            width: 340
+            //! Wide: two thirds of the window, for setting the faders precisely
+            width: expanded ? Math.round(root.width * 2 / 3) : 340
 
             visible: root.pageModel.hasProject && root.pageModel.isTracksPanelVisible
+
+            onExpandToggled: {
+                expanded = !expanded
+            }
             metronomeVisible: root.pageModel.isMetronomeEnabled
 
             navigationSection: tracksPanelNavSec

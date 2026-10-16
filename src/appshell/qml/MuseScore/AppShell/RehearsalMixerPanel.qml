@@ -40,6 +40,10 @@ Rectangle {
 
     readonly property RehearsalMixerModel mixerModel: mixer
 
+    //! Wide sidebar (2/3 of the window) to set the faders more precisely; the page sets the width
+    property bool expanded: false
+    signal expandToggled()
+
     //! The metronome fader is shown while the metronome is enabled
     property bool metronomeVisible: false
 
@@ -125,10 +129,36 @@ Rectangle {
 
         height: prv.touchSize + 2 * prv.cardSpacing
 
+        FlatButton {
+            id: expandPanelButton
+
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+            height: prv.touchSize
+            minWidth: prv.touchSize
+            transparent: true
+
+            icon: root.expanded ? IconCode.ARROW_RIGHT : IconCode.ARROW_LEFT
+            iconFont: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 24 })
+
+            toolTipTitle: root.expanded ? qsTrc("appshell", "Narrow the sidebar") : qsTrc("appshell", "Widen the sidebar")
+            accessible.checked: root.expanded
+
+            navigation.name: "ExpandPanelButton"
+            navigation.panel: headerNavPanel
+            navigation.order: 0
+
+            onClicked: {
+                root.expandToggled()
+            }
+        }
+
         StyledTextLabel {
             id: headerTitle
 
-            anchors.left: parent.left
+            anchors.left: expandPanelButton.right
+            anchors.leftMargin: 4
             anchors.right: newGroupButton.left
             anchors.rightMargin: prv.cardSpacing
             anchors.verticalCenter: parent.verticalCenter
@@ -355,9 +385,9 @@ Rectangle {
 
                         width: parent.width
 
-                        from: mixer.minMetronomeDb
-                        to: mixer.maxMetronomeDb
-                        defaultDb: 0
+                        from: mixer.minVolumeDb
+                        to: mixer.maxAbsoluteDb
+                        defaultDb: mixer.metronomeScoreDb
                         volumeDb: mixer.metronomeDb
 
                         navigation.name: "MetronomeSlider"
@@ -385,6 +415,7 @@ Rectangle {
                     required property bool isSolo
                     required property real volumeDb
                     required property real effectiveDb
+                    required property real scoreDb
                     required property bool groupOn
                     required property bool groupSolo
                     required property bool isExpanded
@@ -673,8 +704,9 @@ Rectangle {
 
                                 enabled: row.isOn
                                 from: mixer.minVolumeDb
-                                to: mixer.maxVolumeDb
-                                defaultDb: mixer.maxVolumeDb
+                                to: row.isGroup ? mixer.maxVolumeDb : mixer.maxAbsoluteDb
+                                //! A double click returns to the volume in the score (to no offset for a group)
+                                defaultDb: row.isGroup ? mixer.maxVolumeDb : row.scoreDb
                                 volumeDb: row.volumeDb
 
                                 navigation.name: "VolumeSlider"

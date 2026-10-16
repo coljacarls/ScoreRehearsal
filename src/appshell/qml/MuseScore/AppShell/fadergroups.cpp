@@ -29,7 +29,7 @@ RehearsalTrackState mu::appshell::applyFaderGroup(const RehearsalTrackState& mem
     RehearsalTrackState result = member;
     result.isOn = member.isOn && group.isOn;
     result.isSolo = member.isSolo || group.isSolo;
-    result.volumeDb = std::clamp(member.volumeDb + group.volumeDb, REHEARSAL_VOLUME_DB_MIN, REHEARSAL_VOLUME_DB_MAX);
+    result.volumeDb = std::clamp(member.volumeDb + group.volumeDb, REHEARSAL_VOLUME_DB_MIN, ABSOLUTE_VOLUME_DB_MAX);
     return result;
 }
 
