@@ -54,6 +54,24 @@ Item {
         root.zoom = Math.max(unit.x - origin.x, 0.0001)
     }
 
+    //! Rounds the corners of the polyline (Chaikin): every segment is replaced by points at 1/4 and 3/4,
+    //! the ends stay where they are
+    function smooth(points) {
+        let result = points
+        for (let pass = 0; pass < 3 && result.length > 2; ++pass) {
+            const next = [result[0]]
+            for (let i = 0; i < result.length - 1; ++i) {
+                const a = result[i]
+                const b = result[i + 1]
+                next.push(Qt.point(0.75 * a.x + 0.25 * b.x, 0.75 * a.y + 0.25 * b.y))
+                next.push(Qt.point(0.25 * a.x + 0.75 * b.x, 0.25 * a.y + 0.75 * b.y))
+            }
+            next.push(result[result.length - 1])
+            result = next
+        }
+        return result
+    }
+
     enabled: false
     clip: true
 
@@ -82,6 +100,7 @@ Item {
             model: root.strokes
 
             Shape {
+                preferredRendererType: Shape.CurveRenderer
                 required property var modelData
 
                 ShapePath {
@@ -92,13 +111,14 @@ Item {
                     joinStyle: ShapePath.RoundJoin
 
                     PathPolyline {
-                        path: modelData
+                        path: root.smooth(modelData)
                     }
                 }
             }
         }
 
         Shape {
+            preferredRendererType: Shape.CurveRenderer
             ShapePath {
                 strokeColor: root.strokeColor
                 strokeWidth: root.lineWidth / root.zoom
@@ -107,7 +127,7 @@ Item {
                 joinStyle: ShapePath.RoundJoin
 
                 PathPolyline {
-                    path: root.liveStroke
+                    path: root.smooth(root.liveStroke)
                 }
             }
         }
