@@ -355,9 +355,9 @@ Rectangle {
 
                         width: parent.width
 
-                        from: mixer.minVolumeDb
-                        to: mixer.maxVolumeDb
-                        defaultDb: mixer.maxVolumeDb
+                        from: mixer.minMetronomeDb
+                        to: mixer.maxMetronomeDb
+                        defaultDb: 0
                         volumeDb: mixer.metronomeDb
 
                         navigation.name: "MetronomeSlider"

@@ -47,6 +47,9 @@ namespace mu::appshell {
 //! all members; the members can still be adjusted individually when the group is expanded.
 //! Flat row list: ungrouped tracks, group headers, expanded members and a footer per expanded group.
 //! Session-only: nothing is written to the score.
+static constexpr float METRONOME_DB_DEFAULT = 0.f;
+static constexpr float METRONOME_DB_MAX = 12.f; // as the maximum of a track in the audio engine
+
 class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, public muse::async::Asyncable,
     public muse::Contextable
 {
@@ -57,6 +60,8 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_PROPERTY(QStringList soloPartIds READ soloPartIds NOTIFY soloPartIdsChanged)
     Q_PROPERTY(float accompanimentDb READ accompanimentDb WRITE setAccompanimentDb NOTIFY accompanimentDbChanged)
     Q_PROPERTY(float metronomeDb READ metronomeDb WRITE setMetronomeDb NOTIFY metronomeDbChanged)
+    Q_PROPERTY(float minMetronomeDb READ minMetronomeDb CONSTANT)
+    Q_PROPERTY(float maxMetronomeDb READ maxMetronomeDb CONSTANT)
     Q_PROPERTY(float minVolumeDb READ minVolumeDb CONSTANT)
     Q_PROPERTY(float maxVolumeDb READ maxVolumeDb CONSTANT)
     Q_PROPERTY(int ungroupedTrackCount READ ungroupedTrackCount NOTIFY structureChanged)
@@ -98,6 +103,9 @@ public:
     void setAccompanimentDb(float db);
 
     //! Volume of the metronome in dB (the metronome is not part of the rehearsal mix)
+    //! The metronome fader is absolute: it sets the volume of the metronome track, whatever the score has stored
+    float minMetronomeDb() const;
+    float maxMetronomeDb() const;
     float metronomeDb() const;
     void setMetronomeDb(float db);
 
@@ -186,7 +194,7 @@ private:
     std::vector<Row> m_rows;
     int m_nextGroupId = 1;
     float m_accompanimentDb = playback::REHEARSAL_VOLUME_DB_MIN;
-    float m_metronomeDb = 0.f;
+    float m_metronomeDb = METRONOME_DB_DEFAULT;
     bool m_hasSolo = false;
     QStringList m_soloPartIds;
     bool m_overrideApplied = false;

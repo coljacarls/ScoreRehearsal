@@ -60,6 +60,11 @@ static float normalizedMixerDb(float db)
     return std::clamp(std::round(db * 10.f) / 10.f, REHEARSAL_VOLUME_DB_MIN, REHEARSAL_VOLUME_DB_MAX);
 }
 
+static float normalizedMetronomeDb(float db)
+{
+    return std::clamp(std::round(db * 10.f) / 10.f, REHEARSAL_VOLUME_DB_MIN, METRONOME_DB_MAX);
+}
+
 //! Track names come XML-escaped from the score (e.g. "F Horn 1 &amp; 3"); the faders show plain text
 static QString plainTrackTitle(QString title)
 {
@@ -157,7 +162,7 @@ void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
     session.nextGroupId = std::max(1, json.value("nextGroupId").toInt(1));
 
     if (json.contains("metronomeDb")) {
-        session.metronomeDb = normalizedMixerDb(static_cast<float>(json.value("metronomeDb").toDouble()));
+        session.metronomeDb = normalizedMetronomeDb(static_cast<float>(json.value("metronomeDb").toDouble()));
     }
 
     const QJsonObject tracks = json.value("tracks").toObject();
@@ -385,7 +390,7 @@ float RehearsalMixerModel::metronomeDb() const
 
 void RehearsalMixerModel::setMetronomeDb(float db)
 {
-    db = normalizedMixerDb(db);
+    db = normalizedMetronomeDb(db);
     if (m_metronomeDb == db) {
         return;
     }
@@ -425,23 +430,11 @@ void RehearsalMixerModel::loadMetronome()
         return;
     }
 
-    const std::optional<float> sessionDb = mixerSessionFor(project).metronomeDb;
-    if (sessionDb) {
-        //! The metronome track is created again when the score is reopened: bring back the volume of the session
-        m_metronomeDb = *sessionDb;
-        emit metronomeDbChanged();
-        applyMetronomeDb();
-        return;
-    }
-
-    //! Not touched in this session: show the volume the metronome has
-    playback()->params(*trackId).onResolve(this, [this](const TrackParams& params) {
-        const float db = normalizedMixerDb(params.control.volume.evaluateAt(0.0, VOLUME_DB_MIN, VOLUME_DB_MAX).raw());
-        if (m_metronomeDb != db) {
-            m_metronomeDb = db;
-            emit metronomeDbChanged();
-        }
-    });
+    //! NOTE The volume stored in the score is ignored: the metronome gets the volume of the fader (of the session),
+    //! also when the metronome track is created again after the score was reopened
+    m_metronomeDb = mixerSessionFor(project).metronomeDb.value_or(METRONOME_DB_DEFAULT);
+    emit metronomeDbChanged();
+    applyMetronomeDb();
 }
 
 void RehearsalMixerModel::applyMetronomeDb()
@@ -455,8 +448,19 @@ void RehearsalMixerModel::applyMetronomeDb()
     playback()->params(*trackId).onResolve(this, [this, trackId, db](const TrackParams& params) {
         ControlParams control = params.control;
         control.volume = volume_db_t::make(db);
+        control.muted = params.control.muted;
         playback()->setControlParams(*trackId, control);
     });
+}
+
+float RehearsalMixerModel::minMetronomeDb() const
+{
+    return REHEARSAL_VOLUME_DB_MIN;
+}
+
+float RehearsalMixerModel::maxMetronomeDb() const
+{
+    return METRONOME_DB_MAX;
 }
 
 float RehearsalMixerModel::minVolumeDb() const
