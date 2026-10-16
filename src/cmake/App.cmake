@@ -29,3 +29,11 @@ endif()
 set(MUSESCORE_APP_CONFIGS_DIR ${PROJECT_SOURCE_DIR}/src/app/configs)
 configure_file(${MUE_EXTERNAL_APP_DIR}/app/app.qrc.in ${CMAKE_BINARY_DIR}/external_app/app.qrc @ONLY)
 set(APP_QRC ${CMAKE_BINARY_DIR}/external_app/app.qrc)
+
+if (OS_IS_WASM)
+    # Emscripten's IndexedDB file system keeps sessions, settings and the score library in the browser
+    # (src/web/storage.js, src/appshell/qml/MuseScore/AppShell/webstorage.*). pre.js exposes FS and IDBFS to
+    # the page script, which Qt does not export reliably. EMCC_LINKER_FLAGS is passed to the app target
+    # by musescore/src/app/CMakeLists.txt.
+    set(EMCC_LINKER_FLAGS "-lidbfs.js" "SHELL:--pre-js ${MUE_EXTERNAL_APP_DIR}/web/pre.js")
+endif()

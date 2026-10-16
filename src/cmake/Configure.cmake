@@ -128,6 +128,28 @@ set(MUE_BUILD_PREFERENCES_MODULE OFF)
 set(MUE_BUILD_PRINT_MODULE OFF)
 set(MUE_BUILD_MACOS_INTEGRATION OFF)
 
+# --- WebAssembly (browser / PWA) ---
+# Mirrors the APP-WEB block of musescore/SetupConfigure.cmake for this app. Re-check it on every
+# upstream merge. The web specific code of the app is guarded by Q_OS_WASM.
+if (OS_IS_WASM)
+    set(MUSE_CONFIGURATION_IS_WEB ON)
+    set(MUE_BUILD_APPJS_MODULE ON)    # fork hook: JS API, audio start and sound font loading (src/web/appjs)
+
+    set(QT_ADD_LINGUISTTOOLS OFF)
+    set(QT_ADD_CONCURRENT OFF)
+    set(QT_QPROCESS_SUPPORTED OFF)
+    set(QT_CONCURRENT_SUPPORTED OFF)
+
+    # Single threaded: GitHub Pages cannot send COOP/COEP, which threads need
+    set(MUSE_THREADS_SUPPORT OFF)
+    set(MUSE_MODULE_UI_SYSTEMDRAG_SUPPORTED OFF)
+    set(MUSE_MODULE_INTERACTIVE_SYNC_SUPPORTED OFF)
+    set(MUSE_MODULE_AUDIO_WORKMODE 2) # driver callback (AudioWorklet)
+
+    set(MUSE_MODULE_ACCESSIBILITY OFF)
+    set(MUE_INSTALL_SOUNDFONT OFF)    # src/web/appjs/install.js and tools/package.mjs ship the sound font
+endif()
+
 # --- Import / export: none (only .mscz / .mscx, which the engraving module reads itself) ---
 set(MUE_BUILD_IMPEXP_BB_MODULE OFF)
 set(MUE_BUILD_IMPEXP_BWW_MODULE OFF)

@@ -1,0 +1,43 @@
+{
+  "id": "./",
+  "name": "ScoreRehearsal",
+  "short_name": "ScoreRehearsal",
+  "description": "Rehearsal player for MuseScore files: tap, play, sing.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#14181c",
+  "theme_color": "#1f5d8c",
+  "categories": ["music", "education"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "application/x-musescore": [".mscz"],
+        "application/x-musescore+xml": [".mscx"]
+      }
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" },
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "score",
+          "accept": [".mscz", ".mscx", "application/x-musescore", "application/x-musescore+xml", "application/octet-stream"]
+        }
+      ]
+    }
+  }
+}

@@ -8,3 +8,7 @@
 __pycache__/
 /logs/
 /test-assets/
+
+# Web version
+/dist/
+src/web/node_modules/
