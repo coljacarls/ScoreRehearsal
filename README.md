@@ -110,6 +110,31 @@ ScoreRehearsal currently runs on Windows. Handy shortcuts: `Space` play/pause, `
 score, `F11` full screen. Playback stutters? In **… → Settings** you can choose the audio device and
 a larger buffer.
 
+### "Windows protected your PC"? Don't worry.
+
+The first time you start ScoreRehearsal, Windows will most likely show you this blue box:
+
+<img src="docs/img/warning.png" alt="Microsoft Defender SmartScreen: Windows protected your PC" width="420">
+
+**What's behind it:** Windows warns about every app that is not *digitally signed* and that it
+hasn't seen on many PCs yet. A signature is a kind of ID card for software: a certificate that
+confirms who published the app. ScoreRehearsal doesn't have one (yet), so Windows simply doesn't
+know who I am. The warning says nothing about the app being harmful – and since the whole source
+code is public, anyone can check what it does.
+
+**How to start it anyway:**
+
+1. Click **More info**.
+2. Click **Run anyway**, which shows up below the app name.
+
+That's it – Windows remembers your choice, so you only have to do this once per version.
+
+**Why isn't it signed?** ScoreRehearsal is a spare-time project. A code signing certificate costs
+money every year and means identity checks, hardware keys and extra steps for every release –
+effort I'd rather put into new features for now. But there's good news: I'm currently working on
+bringing ScoreRehearsal to the **Microsoft Store**. Apps from the Store are signed by Microsoft, so
+the warning will be gone and installing will be a single click.
+
 ## Free and open
 
 ScoreRehearsal is free and open source under the GNU General Public License version 3 (see
