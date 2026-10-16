@@ -28,6 +28,8 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QTimer>
 
 #include "actions/actiontypes.h"
@@ -59,9 +61,8 @@ struct RehearsalViewSession {
     QString partName; // empty: the full score
 };
 
-//! The presentation window is a session-wide state as well (page content and floating bar share it)
-//! The laser pointer mode (taps highlight instead of seeking) only exists while the presentation window is open
-//! The laser pointer mode: 0 = rectangular selection (frame), 1 = pen
+//! The laser pointer tool (otherwise the hand) and its mode: 0 = rectangular selection (frame), 1 = pen, 2 = select
+//! and edit annotations. Session-wide as well.
 int& laserModeValue()
 {
     static int s_mode = 0;
@@ -74,6 +75,7 @@ bool& laserPointerFlag()
     return s_active;
 }
 
+//! The presentation window is a session-wide state as well (page content and floating bar share it)
 bool& presentationWindowOpenFlag()
 {
     static bool s_open = false;
@@ -156,6 +158,7 @@ void RehearsalPageModel::load()
         emit isPresentationWindowOpenChanged();
         emit isLaserPointerActiveChanged();
         emit laserModeChanged();
+        emit annotationsChanged();
         emit isTracksPanelVisibleChanged();
     });
 
@@ -187,11 +190,13 @@ void RehearsalPageModel::load()
         emit scoreTitleChanged();
         emit partsChanged();
         emit currentPartChanged();
+        emit annotationsChanged();
     });
 
     globalContext()->currentNotationChanged().onNotify(this, [this]() {
         emit scoreTitleChanged();
         emit currentPartChanged();
+        emit annotationsChanged();
     });
 
     globalContext()->playbackState()->playbackStatusChanged().onReceive(this, [this](audio::PlaybackStatus) {
@@ -237,6 +242,7 @@ void RehearsalPageModel::subscribeToParts()
     master->excerptsChanged().onNotify(this, [this]() {
         emit partsChanged();
         emit currentPartChanged();
+        emit annotationsChanged();
     });
 }
 
@@ -387,10 +393,6 @@ void RehearsalPageModel::setIsPresentationWindowOpen(bool open)
     }
 
     presentationWindowOpenFlag() = open;
-    if (!open) {
-        laserPointerFlag() = false;
-        laserModeValue() = 0;
-    }
 
     sessionChangedNotification().notify();
 }
@@ -611,18 +613,16 @@ void RehearsalPageModel::quit()
 
 bool RehearsalPageModel::isLaserPointerActive() const
 {
-    return presentationWindowOpenFlag() && laserPointerFlag();
+    return laserPointerFlag();
 }
 
 void RehearsalPageModel::setIsLaserPointerActive(bool active)
 {
-    active = active && presentationWindowOpenFlag();
     if (laserPointerFlag() == active) {
         return;
     }
 
     laserPointerFlag() = active;
-    laserModeValue() = 0;
     sessionChangedNotification().notify();
 }
 
@@ -633,11 +633,165 @@ int RehearsalPageModel::laserMode() const
 
 void RehearsalPageModel::setLaserMode(int mode)
 {
-    mode = std::clamp(mode, 0, 1);
-    if (laserModeValue() == mode || !isLaserPointerActive()) {
+    mode = std::clamp(mode, 0, 2);
+    if (laserModeValue() == mode) {
         return;
     }
 
     laserModeValue() = mode;
     sessionChangedNotification().notify();
+}
+
+namespace {
+QString annotationKey(const RehearsalViewSession& state)
+{
+    return state.partName + (state.viewMode == ViewMode::LINE ? "|continuous" : "|page");
+}
+
+//! The stored session of the current project, with the key of the current part / view mode
+RehearsalSession* storedSessionOf(const INotationProjectPtr& project, QString& key)
+{
+    RehearsalViewSession* state = sessionFor(project);
+    if (!state) {
+        return nullptr;
+    }
+
+    key = annotationKey(*state);
+    return RehearsalSessionStore::instance().findByPath(project->path().toQString());
+}
+
+QJsonObject currentAnnotations(const INotationProjectPtr& project)
+{
+    QString key;
+    const RehearsalSession* stored = storedSessionOf(project, key);
+    return stored ? stored->annotations.value(key).toObject() : QJsonObject();
+}
+
+void storeAnnotations(const INotationProjectPtr& project, const QJsonObject& annotations)
+{
+    QString key;
+    RehearsalSession* stored = storedSessionOf(project, key);
+    if (!stored) {
+        return;
+    }
+
+    if (annotations.isEmpty()) {
+        stored->annotations.remove(key);
+    } else {
+        stored->annotations.insert(key, annotations);
+    }
+
+    RehearsalSessionStore::instance().markChanged(stored->id);
+    sessionChangedNotification().notify();
+}
+}
+
+QVariantList RehearsalPageModel::strokes() const
+{
+    QVariantList result;
+    const QJsonArray strokes = currentAnnotations(globalContext()->currentProject()).value("strokes").toArray();
+    for (const QJsonValue& strokeValue : strokes) {
+        const QJsonArray numbers = strokeValue.toArray();
+        QVariantList points;
+        for (int i = 0; i + 1 < numbers.size(); i += 2) {
+            points.append(QPointF(numbers.at(i).toDouble(), numbers.at(i + 1).toDouble()));
+        }
+        result.append(QVariant(points));
+    }
+    return result;
+}
+
+bool RehearsalPageModel::hasHighlight() const
+{
+    return currentAnnotations(globalContext()->currentProject()).value("highlight").toArray().size() == 4;
+}
+
+QRectF RehearsalPageModel::highlight() const
+{
+    const QJsonArray a = currentAnnotations(globalContext()->currentProject()).value("highlight").toArray();
+    return a.size() == 4 ? QRectF(a.at(0).toDouble(), a.at(1).toDouble(), a.at(2).toDouble(), a.at(3).toDouble()) : QRectF();
+}
+
+void RehearsalPageModel::addStroke(const QVariantList& points)
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    QJsonArray numbers;
+    for (const QVariant& point : points) {
+        const QPointF p = point.toPointF();
+        numbers.append(std::round(p.x() * 10.0) / 10.0);
+        numbers.append(std::round(p.y() * 10.0) / 10.0);
+    }
+
+    if (!project || numbers.size() < 4) {
+        return;
+    }
+
+    QJsonObject annotations = currentAnnotations(project);
+    QJsonArray strokes = annotations.value("strokes").toArray();
+    strokes.append(numbers);
+    annotations["strokes"] = strokes;
+    storeAnnotations(project, annotations);
+}
+
+void RehearsalPageModel::removeStroke(int index)
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    QJsonObject annotations = currentAnnotations(project);
+    QJsonArray strokes = annotations.value("strokes").toArray();
+    if (!project || index < 0 || index >= strokes.size()) {
+        return;
+    }
+
+    strokes.removeAt(index);
+    if (strokes.isEmpty()) {
+        annotations.remove("strokes");
+    } else {
+        annotations["strokes"] = strokes;
+    }
+
+    storeAnnotations(project, annotations);
+}
+
+void RehearsalPageModel::setHighlight(const QRectF& rect)
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    if (!project) {
+        return;
+    }
+
+    QJsonObject annotations = currentAnnotations(project);
+    annotations["highlight"] = QJsonArray { rect.x(), rect.y(), rect.width(), rect.height() };
+    storeAnnotations(project, annotations);
+}
+
+void RehearsalPageModel::clearHighlight()
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    QJsonObject annotations = currentAnnotations(project);
+    if (!project || !annotations.contains("highlight")) {
+        return;
+    }
+
+    annotations.remove("highlight");
+    storeAnnotations(project, annotations);
+}
+
+void RehearsalPageModel::clearAnnotations()
+{
+    if (const INotationProjectPtr project = globalContext()->currentProject()) {
+        storeAnnotations(project, QJsonObject());
+    }
+}
+
+void RehearsalPageModel::askClearAnnotations()
+{
+    interactive()->question(muse::trc("appshell", "Delete annotations"),
+                            muse::trc("appshell", "Do you really want to delete all annotations?"),
+                            { IInteractive::Button::No, IInteractive::Button::Yes },
+                            IInteractive::Button::No)
+    .onResolve(this, [this](const IInteractive::Result& res) {
+        if (res.isButton(IInteractive::Button::Yes)) {
+            clearAnnotations();
+        }
+    });
 }

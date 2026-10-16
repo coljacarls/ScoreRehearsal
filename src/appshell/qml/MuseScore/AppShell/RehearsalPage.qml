@@ -69,11 +69,8 @@ Item {
         property bool immersive: false
         property bool fullScreenSetByImmersive: false
 
-        //! Laser pointer: whether a frame is shown (in both views)
-        property bool laserFrameShown: false
-
-        //! Laser pointer pen: finished strokes and the one being drawn (lists of points in logical coordinates)
-        property var laserStrokes: []
+        //! Laser pointer pen: the stroke that is being drawn (a list of points in logical coordinates); the finished
+        //! strokes and the highlight are annotations in the model (saved in the session)
         property var laserLiveStroke: []
 
         //! Where the presentation window was the last time (e.g. on the second screen)
@@ -112,6 +109,13 @@ Item {
         order: 2
     }
 
+
+    NavigationSection {
+        id: toolsNavSec
+        name: "RehearsalTools"
+        enabled: root.visible && root.pageModel.hasProject
+        order: 3
+    }
     NavigationSection {
         id: tracksPanelNavSec
         name: "RehearsalTracksPanel"
@@ -175,7 +179,7 @@ Item {
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
-                                - presentationButton.width - (laserButton.visible ? laserButton.width + 4 : 0) - laserModeSelector.width - partDropdown.width - controls.width - menuButton.width - 96)
+                                - presentationButton.width - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
@@ -205,40 +209,6 @@ Item {
                     root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
                 }
             }
-
-            LaserPointerButton {
-                id: laserButton
-
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen
-                width: 36
-                height: 36
-
-                active: root.pageModel.isLaserPointerActive
-
-                navigation.panel: topBarLeftNavPanel
-                navigation.order: 3
-
-                onClicked: {
-                    root.pageModel.isLaserPointerActive = !root.pageModel.isLaserPointerActive
-                }
-            }
-
-            LaserModeSelector {
-                id: laserModeSelector
-
-                anchors.verticalCenter: parent.verticalCenter
-
-                expanded: root.pageModel.hasProject && root.pageModel.isLaserPointerActive
-                mode: root.pageModel.laserMode
-
-                navigationPanel: topBarLeftNavPanel
-                navigationOrderStart: 4
-
-                onModeSelected: function(newMode) {
-                    root.pageModel.laserMode = newMode
-                }
-            }
         }
 
         //! The full score or one of the parts defined in the score
@@ -265,7 +235,7 @@ Item {
             currentIndex: root.pageModel.currentPartIndex + 1
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 6
+            navigation.order: 3
             navigation.accessible.name: qsTrc("appshell", "Part")
 
             onActivated: function(index, value) {
@@ -311,7 +281,7 @@ Item {
             toolTipTitle: qsTrc("appshell", "Menu")
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 7
+            navigation.order: 4
 
             onClicked: {
                 appMenu.toggleOpened([
@@ -388,34 +358,40 @@ Item {
             viewModeOverride: root.pageModel.viewModeOverride
 
             laserActive: root.pageModel.isLaserPointerActive
-            penActive: root.pageModel.isLaserPointerActive && root.pageModel.laserMode === 1
-            strokes: prv.laserStrokes
+            laserMode: root.pageModel.laserMode
+            strokes: root.pageModel.strokes
             liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
 
-            onStrokeChanged: function(points, finished) {
-                if (finished) {
-                    prv.laserStrokes = prv.laserStrokes.concat([points])
-                    prv.laserLiveStroke = []
-                } else {
-                    prv.laserLiveStroke = points
-                }
-            }
-
-            onEraseRequested: {
-                root.clearLaserStrokes()
-            }
-
+            //! Rectangle: a tap removes the frame if there is one, otherwise it creates a new frame where it hit
             onLaserTapped: function(logicRect) {
-                //! A tap removes the frame if there is one, otherwise it creates a new frame where it hit
-                if (prv.laserFrameShown) {
-                    root.clearLaserFrame()
+                if (root.pageModel.hasHighlight) {
+                    root.pageModel.clearHighlight()
                 } else {
-                    prv.laserFrameShown = true
-                    notationView.highlight(logicRect)
-                    if (presentationWindowLoader.item) {
-                        presentationWindowLoader.item.highlight(logicRect)
-                    }
+                    root.pageModel.setHighlight(logicRect)
                 }
+            }
+
+            onStrokeProgress: function(points) {
+                prv.laserLiveStroke = points
+            }
+
+            onStrokeFinished: function(points) {
+                root.pageModel.addStroke(points)
+                prv.laserLiveStroke = []
+            }
+
+            onHighlightEdited: function(logicRect) {
+                root.pageModel.setHighlight(logicRect)
+            }
+
+            onHighlightDeleteRequested: {
+                root.pageModel.clearHighlight()
+            }
+
+            onStrokeDeleteRequested: function(index) {
+                root.pageModel.removeStroke(index)
             }
 
             anchors.top: parent.top
@@ -441,6 +417,21 @@ Item {
             onCreateGroupRequested: {
                 faderGroupDialog.open()
             }
+        }
+
+        //! Floating tools over the score: hand, laser pointer and its tools
+        RehearsalToolsPanel {
+            id: toolsPanel
+
+            anchors.top: notationView.top
+            anchors.left: notationView.left
+            anchors.margins: 16
+
+            pageModel: root.pageModel
+            visible: root.pageModel.hasProject
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 1
         }
 
         //! Floating control bar of the immersive mode
@@ -489,30 +480,6 @@ Item {
         }
     }
 
-    function clearLaserStrokes() {
-        prv.laserStrokes = []
-        prv.laserLiveStroke = []
-    }
-
-    function clearLaserFrame() {
-        prv.laserFrameShown = false
-        notationView.clearHighlight()
-        if (presentationWindowLoader.item) {
-            presentationWindowLoader.item.clearHighlight()
-        }
-    }
-
-    Connections {
-        target: root.pageModel
-
-        function onIsLaserPointerActiveChanged() {
-            if (!root.pageModel.isLaserPointerActive) {
-                root.clearLaserFrame()
-                root.clearLaserStrokes()
-            }
-        }
-    }
-
     //! The window for the audience; the model keeps the session-wide "open" state,
     //! so the button in either control bar (top bar, floating bar) opens and closes it
     Loader {
@@ -523,8 +490,10 @@ Item {
         sourceComponent: PresentationWindow {
             initialGeometry: prv.presentationGeometry
             soloPartIds: tracksPanel.mixerModel.soloPartIds
-            strokes: prv.laserStrokes
+            strokes: root.pageModel.strokes
             liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
 
             onCloseRequested: function(geometry) {
                 prv.presentationGeometry = geometry

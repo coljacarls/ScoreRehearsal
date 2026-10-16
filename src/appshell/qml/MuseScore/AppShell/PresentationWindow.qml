@@ -39,6 +39,12 @@ Window {
     //! The strokes drawn with the pen of the laser pointer (lists of points in logical score coordinates)
     property var strokes: []
     property var liveStroke: []
+
+    //! The highlighted rectangle of the laser pointer (logical score coordinates)
+    property bool hasHighlight: false
+    property rect highlight: Qt.rect(0, 0, 0, 0)
+
+    onHighlightChanged: scoreView.setHighlight(root.highlight)
     signal closeRequested(rect geometry)
 
     title: qsTrc("appshell", "Presentation")
@@ -53,15 +59,6 @@ Window {
 
     visible: true
 
-    //! Laser pointer: frames an area of the score (logical coordinates) until clearHighlight()
-    function highlight(logicRect) {
-        scoreView.setHighlight(logicRect)
-        laser.shown = true
-    }
-
-    function clearHighlight() {
-        laser.shown = false
-    }
 
     function toggleFullScreen() {
         root.visibility = (root.visibility === Window.FullScreen) ? Window.Windowed : Window.FullScreen
@@ -96,6 +93,7 @@ Window {
 
         Component.onCompleted: {
             scoreView.load()
+            scoreView.setHighlight(root.highlight)
         }
     }
 
@@ -139,6 +137,7 @@ Window {
         anchors.fill: parent
 
         area: scoreView.highlightRect
+        shown: root.hasHighlight
         shadeColor: prv.shadeColor
     }
 

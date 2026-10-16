@@ -33,6 +33,8 @@ Item {
     property var strokes: []
     //! The stroke that is being drawn
     property var liveStroke: []
+    //! The selected stroke (index in strokes) gets a halo, -1: none
+    property int selectedIndex: -1
 
     readonly property color strokeColor: "#E5322D"
     readonly property real lineWidth: 4
@@ -102,6 +104,19 @@ Item {
             Shape {
                 preferredRendererType: Shape.CurveRenderer
                 required property var modelData
+                required property int index
+
+                ShapePath {
+                    strokeColor: root.selectedIndex === index ? Qt.rgba(1, 0.55, 0, 0.45) : "transparent"
+                    strokeWidth: (root.lineWidth + 10) / root.zoom
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+
+                    PathPolyline {
+                        path: root.smooth(modelData)
+                    }
+                }
 
                 ShapePath {
                     strokeColor: root.strokeColor

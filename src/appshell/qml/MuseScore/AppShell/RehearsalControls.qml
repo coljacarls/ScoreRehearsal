@@ -247,38 +247,6 @@ Item {
             }
         }
 
-        LaserPointerButton {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: root.presentationButtonVisible && root.pageModel.isPresentationWindowOpen
-            width: root.buttonSize
-            height: root.buttonSize
-            iconSize: root.buttonSize >= 40 ? 26 : 22
-
-            active: root.pageModel.isLaserPointerActive
-
-            navigation.panel: navPanel
-            navigation.order: 7
-
-            onClicked: {
-                root.pageModel.isLaserPointerActive = !root.pageModel.isLaserPointerActive
-            }
-        }
-
-        LaserModeSelector {
-            anchors.verticalCenter: parent.verticalCenter
-            buttonSize: root.buttonSize
-
-            expanded: root.presentationButtonVisible && root.pageModel.isLaserPointerActive
-            mode: root.pageModel.laserMode
-
-            navigationPanel: navPanel
-            navigationOrderStart: 8
-
-            onModeSelected: function(newMode) {
-                root.pageModel.laserMode = newMode
-            }
-        }
-
         FlatButton {
             anchors.verticalCenter: parent.verticalCenter
             width: root.buttonSize
@@ -292,7 +260,7 @@ Item {
             accessible.checked: root.immersive
 
             navigation.panel: navPanel
-            navigation.order: 10
+            navigation.order: 7
 
             onClicked: {
                 root.toggleImmersiveRequested()

@@ -47,6 +47,10 @@ struct RehearsalSession {
 
     //! Opaque to the store, written and read by the rehearsal mixer
     QJsonObject mixer;
+
+    //! Annotations of the laser pointer (strokes, highlight) per part and view mode (their coordinates
+    //! belong to a layout): key -> { "strokes": [[x0, y0, x1, y1, ...], ...], "highlight": [x, y, w, h] }
+    QJsonObject annotations;
 };
 
 //! The sessions of the user, persisted as JSON in the user-level app data folder.

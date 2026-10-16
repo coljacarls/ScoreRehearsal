@@ -24,6 +24,8 @@
 #pragma once
 
 #include <QObject>
+#include <QRectF>
+#include <QVariantList>
 #include <QStringList>
 #include <QUrl>
 #include <qqmlintegration.h>
@@ -58,6 +60,9 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(bool isLaserPointerActive READ isLaserPointerActive WRITE setIsLaserPointerActive
                NOTIFY isLaserPointerActiveChanged)
     Q_PROPERTY(int laserMode READ laserMode WRITE setLaserMode NOTIFY laserModeChanged)
+    Q_PROPERTY(QVariantList strokes READ strokes NOTIFY annotationsChanged)
+    Q_PROPERTY(bool hasHighlight READ hasHighlight NOTIFY annotationsChanged)
+    Q_PROPERTY(QRectF highlight READ highlight NOTIFY annotationsChanged)
     Q_PROPERTY(int viewModeOverride READ viewModeOverride NOTIFY isContinuousViewChanged)
     Q_PROPERTY(bool isTracksPanelVisible READ isTracksPanelVisible WRITE setIsTracksPanelVisible NOTIFY isTracksPanelVisibleChanged)
     Q_PROPERTY(bool isFullScreen READ isFullScreen NOTIFY isFullScreenChanged)
@@ -99,13 +104,25 @@ public:
     bool isPresentationWindowOpen() const;
     void setIsPresentationWindowOpen(bool open);
 
-    //! Laser pointer mode: a tap highlights the tapped element in both views instead of seeking.
-    //! Only possible while the presentation window is open (closing it ends the mode).
+    //! Laser pointer tool (instead of the hand): the score is not dragged, taps do not seek.
     bool isLaserPointerActive() const;
     void setIsLaserPointerActive(bool active);
-    //! 0 = rectangular selection (a tap frames the tapped element), 1 = pen (freeform drawing)
+    //! 0 = rectangular selection (a tap frames the tapped element), 1 = pen (freeform drawing),
+    //! 2 = select annotations to resize or delete them
     int laserMode() const;
     void setLaserMode(int mode);
+
+    //! The annotations of the laser pointer on the current part / view mode (logical score coordinates),
+    //! stored in the session of the score: freeform strokes (lists of points) and one highlighted rectangle
+    QVariantList strokes() const;
+    bool hasHighlight() const;
+    QRectF highlight() const;
+    Q_INVOKABLE void addStroke(const QVariantList& points);
+    Q_INVOKABLE void removeStroke(int index);
+    Q_INVOKABLE void setHighlight(const QRectF& rect);
+    Q_INVOKABLE void clearHighlight();
+    //! Asks whether to delete all annotations, deletes them on yes
+    Q_INVOKABLE void askClearAnnotations();
 
     bool isTracksPanelVisible() const;
     void setIsTracksPanelVisible(bool visible);
@@ -154,6 +171,7 @@ signals:
     void isPresentationWindowOpenChanged();
     void isLaserPointerActiveChanged();
     void laserModeChanged();
+    void annotationsChanged();
     void isTracksPanelVisibleChanged();
     void isFullScreenChanged();
     void isDarkThemeChanged();
@@ -176,5 +194,6 @@ private:
     void askForMissingFile(const QString& sessionId);
     void relinkSession(const QString& sessionId);
     void savePlayhead();
+    void clearAnnotations();
 };
 }
