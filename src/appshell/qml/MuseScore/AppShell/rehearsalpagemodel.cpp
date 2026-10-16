@@ -69,6 +69,18 @@ int& laserModeValue()
     return s_mode;
 }
 
+bool& chordScrubFlag()
+{
+    static bool s_active = false;
+    return s_active;
+}
+
+bool& pitchPipeFlag()
+{
+    static bool s_active = false;
+    return s_active;
+}
+
 bool& laserPointerFlag()
 {
     static bool s_active = false;
@@ -157,6 +169,8 @@ void RehearsalPageModel::load()
         emit isContinuousViewChanged();
         emit isPresentationWindowOpenChanged();
         emit isLaserPointerActiveChanged();
+        emit isPitchPipeActiveChanged();
+        emit isChordScrubActiveChanged();
         emit laserModeChanged();
         emit annotationsChanged();
         emit isTracksPanelVisibleChanged();
@@ -623,6 +637,48 @@ void RehearsalPageModel::setIsLaserPointerActive(bool active)
     }
 
     laserPointerFlag() = active;
+    if (active) {
+        pitchPipeFlag() = false;
+        chordScrubFlag() = false;
+    }
+    sessionChangedNotification().notify();
+}
+
+bool RehearsalPageModel::isPitchPipeActive() const
+{
+    return pitchPipeFlag();
+}
+
+void RehearsalPageModel::setIsPitchPipeActive(bool active)
+{
+    if (pitchPipeFlag() == active) {
+        return;
+    }
+
+    pitchPipeFlag() = active;
+    if (active) {
+        laserPointerFlag() = false;
+        chordScrubFlag() = false;
+    }
+    sessionChangedNotification().notify();
+}
+
+bool RehearsalPageModel::isChordScrubActive() const
+{
+    return chordScrubFlag();
+}
+
+void RehearsalPageModel::setIsChordScrubActive(bool active)
+{
+    if (chordScrubFlag() == active) {
+        return;
+    }
+
+    chordScrubFlag() = active;
+    if (active) {
+        laserPointerFlag() = false;
+        pitchPipeFlag() = false;
+    }
     sessionChangedNotification().notify();
 }
 

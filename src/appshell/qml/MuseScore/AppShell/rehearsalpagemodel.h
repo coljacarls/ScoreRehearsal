@@ -59,6 +59,9 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
                NOTIFY isPresentationWindowOpenChanged)
     Q_PROPERTY(bool isLaserPointerActive READ isLaserPointerActive WRITE setIsLaserPointerActive
                NOTIFY isLaserPointerActiveChanged)
+    Q_PROPERTY(bool isPitchPipeActive READ isPitchPipeActive WRITE setIsPitchPipeActive NOTIFY isPitchPipeActiveChanged)
+    Q_PROPERTY(bool isChordScrubActive READ isChordScrubActive WRITE setIsChordScrubActive
+               NOTIFY isChordScrubActiveChanged)
     Q_PROPERTY(int laserMode READ laserMode WRITE setLaserMode NOTIFY laserModeChanged)
     Q_PROPERTY(QVariantList strokes READ strokes NOTIFY annotationsChanged)
     Q_PROPERTY(bool hasHighlight READ hasHighlight NOTIFY annotationsChanged)
@@ -107,6 +110,14 @@ public:
     //! Laser pointer tool (instead of the hand): the score is not dragged, taps do not seek.
     bool isLaserPointerActive() const;
     void setIsLaserPointerActive(bool active);
+    //! Chord scrubbing tool (instead of the hand): the score is not dragged, the chord at the finger sounds while it is
+    //! held and follows it, without moving the playhead. Excludes the other tools.
+    bool isChordScrubActive() const;
+    void setIsChordScrubActive(bool active);
+    //! Pitch pipe tool (instead of the hand): the score is not dragged, a touched note sounds while it is held.
+    //! Excludes the other tools.
+    bool isPitchPipeActive() const;
+    void setIsPitchPipeActive(bool active);
     //! 0 = rectangular selection (a tap frames the tapped element), 1 = pen (freeform drawing),
     //! 2 = select annotations to resize or delete them
     int laserMode() const;
@@ -172,6 +183,8 @@ signals:
     void isContinuousViewChanged();
     void isPresentationWindowOpenChanged();
     void isLaserPointerActiveChanged();
+    void isPitchPipeActiveChanged();
+    void isChordScrubActiveChanged();
     void laserModeChanged();
     void annotationsChanged();
     void isTracksPanelVisibleChanged();

@@ -43,6 +43,13 @@ Item {
 
     //! Laser pointer instead of the hand, and its tool: 0 = rectangle, 1 = pen, 2 = select
     property bool laserActive: false
+    //! Pitch pipe instead of the hand: touched notes sound
+    property bool pitchPipeActive: false
+    //! Chord scrubbing instead of the hand: the chord at the finger sounds, the playhead does not move
+    property bool chordScrubActive: false
+    //! The areas of the sounding notes (logical score coordinates) that the views point at with a hand
+    readonly property var soundingRects: root.pitchPipeActive ? (pitchPipe.sounding ? [pitchPipe.noteRect] : [])
+                                                              : chordScrubber.noteRects
     property int laserMode: 0
 
     //! The annotations (logical score coordinates): strokes are lists of points, the highlight is a rectangle
@@ -176,6 +183,10 @@ Item {
         id: chordScrubber
     }
 
+    PitchPipe {
+        id: pitchPipe
+    }
+
     NotationView {
         id: notationView
 
@@ -185,11 +196,28 @@ Item {
         tapToSeek: true
         reportTaps: root.laserActive
         //! Press and hold: the playhead follows the finger and the chord at its position sounds
-        reportScrubs: !root.laserActive
+        //! Only with the tools to give pitches: the touch sounds notes right away, the score is not moved
+        reportScrubs: root.pitchPipeActive || root.chordScrubActive
+        scrubDelay: 0
 
-        onScrubBegan: function(logicPos) { chordScrubber.begin(logicPos) }
-        onScrubMoved: function(logicPos) { chordScrubber.move(logicPos) }
-        onScrubEnded: chordScrubber.end()
+        onScrubBegan: function(logicPos) {
+            if (root.pitchPipeActive) {
+                pitchPipe.begin(logicPos)
+            } else {
+                chordScrubber.begin(logicPos)
+            }
+        }
+        onScrubMoved: function(logicPos) {
+            if (root.pitchPipeActive) {
+                pitchPipe.move(logicPos)
+            } else {
+                chordScrubber.move(logicPos)
+            }
+        }
+        onScrubEnded: {
+            pitchPipe.end()
+            chordScrubber.end()
+        }
 
         onTapped: function(logicRect) {
             root.laserTapped(logicRect)
@@ -232,6 +260,14 @@ Item {
         strokes: root.strokes
         liveStroke: root.liveStroke
         selectedIndex: root.selectedKind === "stroke" ? root.selectedStroke : -1
+    }
+
+    //! The hands that point at the notes that sound (pitch pipe, chord scrubbing)
+    PitchPipeHand {
+        anchors.fill: parent
+
+        paintView: notationView.paintView
+        logicRects: root.soundingRects
     }
 
     //! Pen: takes the mouse and touch input, drawing instead of moving the score

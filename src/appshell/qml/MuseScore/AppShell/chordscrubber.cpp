@@ -32,8 +32,9 @@
 #include "engraving/dom/note.h"
 #include "engraving/dom/score.h"
 #include "engraving/dom/segment.h"
-#include "engraving/dom/tie.h"
 #include "engraving/dom/utils.h"
+
+#include "offstreamplayback.h"
 
 #include "notation/imasternotation.h"
 #include "notation/inotation.h"
@@ -44,24 +45,20 @@ using namespace mu::appshell;
 using namespace mu::engraving;
 
 namespace {
-//! Long enough to sound until the finger is lifted (the sound is cut then)
-constexpr muse::mpe::duration_t HOLD_DURATION = 600ll * 1000 * 1000;
-
-//! The first note of a tie chain: only that one starts a sound
-const Note* tieStart(const Note* note)
+//! The same note in another score of the project (the shown score can be a part); null if it is not in there
+const Note* linkedNoteIn(const Note* note, const Score* score)
 {
-    while (note->tieBack() && note->tieBack()->startNote()) {
-        note = note->tieBack()->startNote();
+    if (note->score() == score) {
+        return note;
     }
 
-    return note;
-}
+    for (const EngravingObject* linked : note->linkList()) {
+        if (linked->score() == score && linked->isNote()) {
+            return toNote(linked);
+        }
+    }
 
-//! Flushing the off stream with no events cuts the sound of the track
-void silence(const mu::notation::INotationPlaybackPtr& playback, const InstrumentTrackId& trackId)
-{
-    muse::mpe::OffStreamChanges offStream = playback->trackPlaybackData(trackId).offStream; // shares the channel
-    offStream.send(muse::mpe::PlaybackEventsMap(), true);
+    return nullptr;
 }
 }
 
@@ -75,6 +72,21 @@ ChordScrubber::~ChordScrubber()
     if (m_active) {
         stopSound();
     }
+}
+
+QVariantList ChordScrubber::noteRects() const
+{
+    return m_noteRects;
+}
+
+void ChordScrubber::setNoteRects(const QVariantList& rects)
+{
+    if (rects == m_noteRects) {
+        return;
+    }
+
+    m_noteRects = rects;
+    emit noteRectsChanged();
 }
 
 void ChordScrubber::begin(const QPointF& logicPos)
@@ -127,15 +139,12 @@ void ChordScrubber::playAt(const QPointF& logicPos)
     }
 
     const MasterScore* score = master->masterScore();
-    const Segment* segment = score->tick2segment(tick, true, SegmentType::ChordRest);
-    if (!segment) {
-        return;
-    }
 
     m_lastTick = tick.ticks();
 
     //! Everything that sounds at the tick, also long notes that started before
     std::map<InstrumentTrackId, std::vector<const EngravingItem*> > notesByTrack;
+    QVariantList rects;
     for (track_idx_t track = 0; track < score->ntracks(); ++track) {
         const ChordRest* cr = score->findCR(tick, track);
         if (!cr || !cr->isChord()) {
@@ -149,18 +158,12 @@ void ChordScrubber::playAt(const QPointF& logicPos)
             }
 
             notesByTrack[makeInstrumentTrackId(start)].push_back(start);
+
+            //! Pointed at in the shown score, if the note is in it (a part shows only some of the instruments)
+            if (const Note* shown = linkedNoteIn(note, shownScore)) {
+                rects.push_back(shown->canvasBoundingRect().toQRectF());
+            }
         }
-    }
-
-    const EngravingItem* anchor = nullptr;
-    for (track_idx_t track = 0; track < score->ntracks() && !anchor; ++track) {
-        anchor = segment->element(track);
-    }
-
-    if (anchor) {
-        //! No flush: a seek that flushes the sound would also cut the chord that is triggered right after it
-        //! (the order of both on the audio thread is not guaranteed). The tracks are flushed by their own triggers.
-        playbackController()->seekElement(anchor, false);
     }
 
     const notation::INotationPlaybackPtr playback = master->playback();
@@ -173,11 +176,12 @@ void ChordScrubber::playAt(const QPointF& logicPos)
     //! Tracks that sounded before and are silent now
     for (const InstrumentTrackId& trackId : m_soundingTracks) {
         if (!nowSounding.count(trackId)) {
-            silence(playback, trackId);
+            silenceTrack(playback, trackId);
         }
     }
 
     m_soundingTracks = nowSounding;
+    setNoteRects(rects);
 }
 
 void ChordScrubber::stopSound()
@@ -185,9 +189,11 @@ void ChordScrubber::stopSound()
     const notation::IMasterNotationPtr master = globalContext()->currentMasterNotation();
     if (master && master->playback()) {
         for (const InstrumentTrackId& trackId : m_soundingTracks) {
-            silence(master->playback(), trackId);
+            silenceTrack(master->playback(), trackId);
         }
     }
 
     m_soundingTracks.clear();
+    m_lastTick = -1;
+    setNoteRects({});
 }
