@@ -35,6 +35,10 @@ Window {
 
     //! Parts that are solo in the rehearsal view: the rest of the score is shaded
     property var soloPartIds: []
+
+    //! The strokes drawn with the pen of the laser pointer (lists of points in logical score coordinates)
+    property var strokes: []
+    property var liveStroke: []
     signal closeRequested(rect geometry)
 
     title: qsTrc("appshell", "Presentation")
@@ -136,6 +140,15 @@ Window {
 
         area: scoreView.highlightRect
         shadeColor: prv.shadeColor
+    }
+
+    //! The strokes: on top of the shade and the frame
+    LaserDrawing {
+        anchors.fill: parent
+
+        paintView: scoreView
+        strokes: root.strokes
+        liveStroke: root.liveStroke
     }
 
     PresentationSettingsModel {

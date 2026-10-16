@@ -25,6 +25,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 
+import Muse.Ui
+import Muse.UiComponents
 import MuseScore.NotationScene
 import MuseScore.AppShell
 
@@ -38,6 +40,14 @@ Item {
     //! Laser pointer mode: a tap does not seek but is reported (the page decides what to frame)
     property bool laserActive: false
     signal laserTapped(rect logicRect)
+
+    //! The pen: the drawn strokes (lists of points in logical score coordinates) belong to the page,
+    //! the view reports the stroke that is being drawn (finished: the finger or mouse was lifted)
+    property bool penActive: false
+    property var strokes: []
+    property var liveStroke: []
+    signal strokeChanged(var points, bool finished)
+    signal eraseRequested()
 
     NotationView {
         id: notationView
@@ -99,5 +109,84 @@ Item {
 
         area: root.viewArea
         shadeColor: Qt.rgba(0, 0, 0, settings.shadePercent / 100)
+    }
+
+    //! The strokes are on top of everything, above the shade of the highlight
+    LaserDrawing {
+        anchors.fill: parent
+
+        paintView: notationView.paintView
+        strokes: root.strokes
+        liveStroke: root.liveStroke
+    }
+
+    //! Takes the mouse and touch input while the pen is active: drawing instead of moving the score
+    MouseArea {
+        id: penArea
+
+        property var points: []
+
+        anchors.fill: parent
+        enabled: root.penActive
+        visible: root.penActive
+        acceptedButtons: Qt.LeftButton
+        preventStealing: true
+        cursorShape: Qt.CrossCursor
+
+        function logicalPoint(x, y) {
+            const viewPos = root.mapToItem(notationView.paintView, x, y)
+            return notationView.paintView.viewToLogical(Qt.point(viewPos.x, viewPos.y))
+        }
+
+        function finish() {
+            if (penArea.points.length === 1) {
+                //! A tap makes a dot
+                const p = penArea.points[0]
+                penArea.points = [p, Qt.point(p.x + 0.01, p.y)]
+            }
+
+            if (penArea.points.length > 0) {
+                root.strokeChanged(penArea.points, true)
+            }
+
+            penArea.points = []
+        }
+
+        onPressed: function(mouse) {
+            penArea.points = [penArea.logicalPoint(mouse.x, mouse.y)]
+            root.strokeChanged(penArea.points, false)
+        }
+
+        onPositionChanged: function(mouse) {
+            if (!penArea.pressed || penArea.points.length === 0) {
+                return
+            }
+
+            penArea.points = penArea.points.concat([penArea.logicalPoint(mouse.x, mouse.y)])
+            root.strokeChanged(penArea.points, false)
+        }
+
+        onReleased: penArea.finish()
+        onCanceled: penArea.finish()
+    }
+
+    //! Floating button over the score: erases all strokes
+    FlatButton {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 16
+
+        width: 48
+        height: 48
+
+        visible: root.strokes.length > 0 || root.liveStroke.length > 0
+        icon: IconCode.ERASER
+        iconFont: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 26 })
+
+        toolTipTitle: qsTrc("appshell", "Erase all strokes")
+
+        onClicked: {
+            root.eraseRequested()
+        }
     }
 }

@@ -72,6 +72,10 @@ Item {
         //! Laser pointer: whether a frame is shown (in both views)
         property bool laserFrameShown: false
 
+        //! Laser pointer pen: finished strokes and the one being drawn (lists of points in logical coordinates)
+        property var laserStrokes: []
+        property var laserLiveStroke: []
+
         //! Where the presentation window was the last time (e.g. on the second screen)
         property rect presentationGeometry: Qt.rect(100, 100, 1280, 360)
     }
@@ -171,7 +175,7 @@ Item {
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
-                                - presentationButton.width - (laserButton.visible ? laserButton.width + 4 : 0) - partDropdown.width - controls.width - menuButton.width - 96)
+                                - presentationButton.width - (laserButton.visible ? laserButton.width + 4 : 0) - laserModeSelector.width - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
@@ -218,6 +222,22 @@ Item {
                 onClicked: {
                     root.pageModel.isLaserPointerActive = !root.pageModel.isLaserPointerActive
                 }
+
+            LaserModeSelector {
+                id: laserModeSelector
+
+                anchors.verticalCenter: parent.verticalCenter
+
+                expanded: root.pageModel.hasProject && root.pageModel.isLaserPointerActive
+                mode: root.pageModel.laserMode
+
+                navigationPanel: topBarLeftNavPanel
+                navigationOrderStart: 4
+
+                onModeSelected: function(newMode) {
+                    root.pageModel.laserMode = newMode
+                }
+            }
             }
         }
 
@@ -245,7 +265,7 @@ Item {
             currentIndex: root.pageModel.currentPartIndex + 1
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 4
+            navigation.order: 6
             navigation.accessible.name: qsTrc("appshell", "Part")
 
             onActivated: function(index, value) {
@@ -291,7 +311,7 @@ Item {
             toolTipTitle: qsTrc("appshell", "Menu")
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 5
+            navigation.order: 7
 
             onClicked: {
                 appMenu.toggleOpened([
@@ -368,6 +388,22 @@ Item {
             viewModeOverride: root.pageModel.viewModeOverride
 
             laserActive: root.pageModel.isLaserPointerActive
+            penActive: root.pageModel.isLaserPointerActive && root.pageModel.laserMode === 1
+            strokes: prv.laserStrokes
+            liveStroke: prv.laserLiveStroke
+
+            onStrokeChanged: function(points, finished) {
+                if (finished) {
+                    prv.laserStrokes = prv.laserStrokes.concat([points])
+                    prv.laserLiveStroke = []
+                } else {
+                    prv.laserLiveStroke = points
+                }
+            }
+
+            onEraseRequested: {
+                root.clearLaserStrokes()
+            }
 
             onLaserTapped: function(logicRect) {
                 //! A tap removes the frame if there is one, otherwise it creates a new frame where it hit
@@ -453,6 +489,11 @@ Item {
         }
     }
 
+    function clearLaserStrokes() {
+        prv.laserStrokes = []
+        prv.laserLiveStroke = []
+    }
+
     function clearLaserFrame() {
         prv.laserFrameShown = false
         notationView.clearHighlight()
@@ -467,6 +508,7 @@ Item {
         function onIsLaserPointerActiveChanged() {
             if (!root.pageModel.isLaserPointerActive) {
                 root.clearLaserFrame()
+                root.clearLaserStrokes()
             }
         }
     }
@@ -481,6 +523,8 @@ Item {
         sourceComponent: PresentationWindow {
             initialGeometry: prv.presentationGeometry
             soloPartIds: tracksPanel.mixerModel.soloPartIds
+            strokes: prv.laserStrokes
+            liveStroke: prv.laserLiveStroke
 
             onCloseRequested: function(geometry) {
                 prv.presentationGeometry = geometry

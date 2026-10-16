@@ -57,6 +57,7 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
                NOTIFY isPresentationWindowOpenChanged)
     Q_PROPERTY(bool isLaserPointerActive READ isLaserPointerActive WRITE setIsLaserPointerActive
                NOTIFY isLaserPointerActiveChanged)
+    Q_PROPERTY(int laserMode READ laserMode WRITE setLaserMode NOTIFY laserModeChanged)
     Q_PROPERTY(int viewModeOverride READ viewModeOverride NOTIFY isContinuousViewChanged)
     Q_PROPERTY(bool isTracksPanelVisible READ isTracksPanelVisible WRITE setIsTracksPanelVisible NOTIFY isTracksPanelVisibleChanged)
     Q_PROPERTY(bool isFullScreen READ isFullScreen NOTIFY isFullScreenChanged)
@@ -102,6 +103,9 @@ public:
     //! Only possible while the presentation window is open (closing it ends the mode).
     bool isLaserPointerActive() const;
     void setIsLaserPointerActive(bool active);
+    //! 0 = rectangular selection (a tap frames the tapped element), 1 = pen (freeform drawing)
+    int laserMode() const;
+    void setLaserMode(int mode);
 
     bool isTracksPanelVisible() const;
     void setIsTracksPanelVisible(bool visible);
@@ -149,6 +153,7 @@ signals:
     void isContinuousViewChanged();
     void isPresentationWindowOpenChanged();
     void isLaserPointerActiveChanged();
+    void laserModeChanged();
     void isTracksPanelVisibleChanged();
     void isFullScreenChanged();
     void isDarkThemeChanged();

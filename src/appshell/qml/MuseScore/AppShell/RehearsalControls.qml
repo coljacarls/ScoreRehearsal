@@ -264,6 +264,21 @@ Item {
             }
         }
 
+        LaserModeSelector {
+            anchors.verticalCenter: parent.verticalCenter
+            buttonSize: root.buttonSize
+
+            expanded: root.presentationButtonVisible && root.pageModel.isLaserPointerActive
+            mode: root.pageModel.laserMode
+
+            navigationPanel: navPanel
+            navigationOrderStart: 8
+
+            onModeSelected: function(newMode) {
+                root.pageModel.laserMode = newMode
+            }
+        }
+
         FlatButton {
             anchors.verticalCenter: parent.verticalCenter
             width: root.buttonSize
@@ -277,7 +292,7 @@ Item {
             accessible.checked: root.immersive
 
             navigation.panel: navPanel
-            navigation.order: 8
+            navigation.order: 10
 
             onClicked: {
                 root.toggleImmersiveRequested()
