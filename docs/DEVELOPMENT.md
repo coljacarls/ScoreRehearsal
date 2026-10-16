@@ -68,6 +68,10 @@ directory, tag `vX.Y.Z` on the merge commit) when a pull request is merged into 
 either its title contains a version (`Release v1.0.1`) or it has a label `release:major`,
 `release:minor` or `release:patch` (bumps the latest tag). Other pull requests do not release.
 
+The pull request description becomes the release notes on the GitHub release page, followed by
+the notes GitHub generates. Describe the new features, improvements and fixes there, written for
+users.
+
 ## Updating the MuseScore dependency
 
 MuseScore is pulled in through the submodule, so updating is a merge in the fork plus a pointer
