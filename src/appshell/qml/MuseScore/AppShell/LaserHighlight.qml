@@ -32,53 +32,19 @@ Item {
     readonly property color frameColor: "#FF8C00"
     readonly property real lineWidth: 3
     readonly property int fadeDuration: 250
-    readonly property int blinkInterval: 300
-    readonly property int blinkCount: 3
-
-    //! A new frame flashes a few times before it stays: blinkStep counts the switches (on, off, on, off, ..., on)
-    property bool blinking: false
-    property int blinkStep: 0
-
-    onShownChanged: {
-        if (root.shown) {
-            root.blinkStep = 0
-            root.blinking = true
-            blinkTimer.restart()
-        } else {
-            root.blinking = false
-            blinkTimer.stop()
-        }
-    }
 
     x: area.x - lineWidth / 2
     y: area.y - lineWidth / 2
     width: area.width + lineWidth
     height: area.height + lineWidth
 
-    opacity: !root.shown ? 0 : (root.blinking && root.blinkStep % 2 === 1) ? 0 : 1
+    opacity: root.shown ? 1 : 0
     visible: opacity > 0
     enabled: false
 
     Behavior on opacity {
-        enabled: !root.blinking
-
         NumberAnimation {
             duration: root.fadeDuration
-        }
-    }
-
-    Timer {
-        id: blinkTimer
-
-        interval: root.blinkInterval
-        repeat: true
-
-        onTriggered: {
-            root.blinkStep += 1
-            if (root.blinkStep >= 2 * root.blinkCount) {
-                root.blinking = false
-                blinkTimer.stop()
-            }
         }
     }
 
