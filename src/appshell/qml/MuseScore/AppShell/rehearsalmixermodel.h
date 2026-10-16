@@ -25,6 +25,8 @@
 
 #include <QAbstractListModel>
 #include <QQmlParserStatus>
+#include <optional>
+
 #include <QVariantList>
 #include <qqmlintegration.h>
 
@@ -52,10 +54,21 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_INTERFACES(QQmlParserStatus)
 
     Q_PROPERTY(bool hasSolo READ hasSolo NOTIFY hasSoloChanged)
+    Q_PROPERTY(QStringList soloPartIds READ soloPartIds NOTIFY soloPartIdsChanged)
     Q_PROPERTY(float accompanimentDb READ accompanimentDb WRITE setAccompanimentDb NOTIFY accompanimentDbChanged)
+    Q_PROPERTY(float metronomeDb READ metronomeDb WRITE setMetronomeDb NOTIFY metronomeDbChanged)
+    //! Range of the absolute faders (tracks, metronome); minVolumeDb and maxVolumeDb are the range of the relative ones
+    Q_PROPERTY(float maxAbsoluteDb READ maxAbsoluteDb CONSTANT)
+    Q_PROPERTY(float metronomeScoreDb READ metronomeScoreDb NOTIFY metronomeDbChanged)
     Q_PROPERTY(float minVolumeDb READ minVolumeDb CONSTANT)
     Q_PROPERTY(float maxVolumeDb READ maxVolumeDb CONSTANT)
     Q_PROPERTY(int ungroupedTrackCount READ ungroupedTrackCount NOTIFY structureChanged)
+    //! A part (not the full score) is shown
+    Q_PROPERTY(bool isPartShown READ isPartShown NOTIFY scopeChanged)
+    //! Only the tracks of the shown part are played and have faders (otherwise all tracks of the score)
+    Q_PROPERTY(bool shownPartOnly READ shownPartOnly WRITE setShownPartOnly NOTIFY scopeChanged)
+    //! Whether the tracks are limited to the ones of the shown part right now (a part is shown and shownPartOnly)
+    Q_PROPERTY(bool partScopeActive READ partScopeActive NOTIFY scopeChanged)
 
     QML_ELEMENT
 
@@ -78,6 +91,7 @@ public:
         GroupOnRole,                    // "groupOn": members: whether the group is on
         GroupSoloRole,                  // "groupSolo": members: whether the group is solo
         IsExpandedRole,                 // "isExpanded": groups and their rows
+        ScoreDbRole,                    // "scoreDb": tracks: volume in the score
         MemberCountRole                 // "memberCount": groups
     };
 
@@ -87,13 +101,28 @@ public:
 
     bool hasSolo() const;
 
+    //! Ids of the parts that have a solo track (own or by group); empty without solo
+    QStringList soloPartIds() const;
+
     float accompanimentDb() const;
     void setAccompanimentDb(float db);
+
+    //! Volume of the metronome in dB (the metronome is not part of the rehearsal mix)
+    float maxAbsoluteDb() const;
+    //! The volume of the metronome in the score, to which its fader returns by a double click
+    float metronomeScoreDb() const;
+    float metronomeDb() const;
+    void setMetronomeDb(float db);
 
     float minVolumeDb() const;
     float maxVolumeDb() const;
 
     int ungroupedTrackCount() const;
+
+    bool isPartShown() const;
+    bool shownPartOnly() const;
+    void setShownPartOnly(bool only);
+    bool partScopeActive() const;
 
     Q_INVOKABLE void setOn(int row, bool on);
     Q_INVOKABLE void setSolo(int row, bool solo);
@@ -111,14 +140,18 @@ public:
 
 signals:
     void hasSoloChanged();
+    void soloPartIdsChanged();
     void accompanimentDbChanged();
+    void metronomeDbChanged();
     void structureChanged();
+    void scopeChanged();
 
 private:
     struct Track {
         playback::RehearsalTrackState state;
         muse::audio::TrackId trackId = -1;
         QString title;
+        float scoreDb = 0.f; // volume of the track stored in the score
     };
 
     enum class RowType {
@@ -149,6 +182,12 @@ private:
     int groupIndexOfTrack(const engraving::InstrumentTrackId& instrumentTrackId) const;
     bool isValidRow(int row) const;
 
+    //! Whether the track is played and shown with the current scope (see partScopeActive)
+    bool isInScope(const engraving::InstrumentTrackId& instrumentTrackId) const;
+    //! Reads which part is shown; returns whether that changed
+    bool readShownPart();
+    void updateScope();
+
     //! Rebuilds the row list from tracks and groups (resets the model)
     void rebuildRows();
     std::vector<Row> buildRows() const;
@@ -160,15 +199,31 @@ private:
     void updateHasSolo();
     void saveSession();
 
+    std::optional<muse::audio::TrackId> metronomeTrackId() const;
+    //! Reads the volume of the metronome track, or applies the one of the session
+    void loadMetronome();
+    void applyMetronomeDb();
+
     bool isPageActive() const;
     void updateMixOverride();
+    playback::SessionMix calculateMix() const;
 
     std::vector<Track> m_tracks;
     std::vector<FaderGroup> m_groups;
     std::vector<Row> m_rows;
     int m_nextGroupId = 1;
     float m_accompanimentDb = playback::REHEARSAL_VOLUME_DB_MIN;
+    float m_metronomeDb = 0.f;
+    float m_metronomeScoreDb = 0.f;
+    //! Whether the groups and faders of the session were loaded: before that (no playback yet) the model is empty
+    //! and must not be written to the session
+    bool m_sessionLoaded = false;
     bool m_hasSolo = false;
+    QStringList m_soloPartIds;
     bool m_overrideApplied = false;
+
+    bool m_isPartShown = false;
+    bool m_shownPartOnly = false;
+    std::vector<muse::ID> m_shownPartIds;
 };
 }

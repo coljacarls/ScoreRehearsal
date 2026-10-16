@@ -29,16 +29,18 @@ import Muse.UiComponents
 import MuseScore.AppShell
 
 //! Rehearsal controls: to start, play/pause, position, metronome, view mode,
-//! tracks panel toggle, fullscreen (immersive) toggle.
+//! tracks panel toggle, (optionally) view mode and presentation window toggle.
 //! Used in the main tab row and in the floating bar of the immersive mode
 Item {
     id: root
 
     required property RehearsalPageModel pageModel
 
-    //! Whether the immersive (fullscreen) mode is active
-    property bool immersive: false
-    signal toggleImmersiveRequested()
+    //! The top bar has the view mode button in front of the part dropdown; the floating bar needs it here
+    property bool viewModeButtonVisible: false
+
+    //! The top bar has the presentation window button (next to the title); the floating bar needs it here
+    property bool presentationButtonVisible: false
 
     property NavigationSection navigationSection: null
     property int navigationOrderStart: 1
@@ -146,58 +148,15 @@ Item {
             }
         }
 
-        FlatButton {
-            id: viewModeButton
-
+        ViewModeButton {
             anchors.verticalCenter: parent.verticalCenter
-            height: root.buttonSize
-            width: Math.max(root.buttonSize, implicitWidth)
+            visible: root.viewModeButtonVisible
 
-            transparent: !viewModeMenu.isMenuOpened
-            accentButton: viewModeMenu.isMenuOpened
-            orientation: Qt.Horizontal
-            buttonType: FlatButton.Horizontal
+            pageModel: root.pageModel
+            buttonSize: root.buttonSize
 
-            icon: root.pageModel.isContinuousView ? IconCode.CONTINUOUS_VIEW : IconCode.PAGE_VIEW
-            toolTipTitle: root.pageModel.isContinuousView ? qsTrc("appshell", "Continuous view (horizontal)")
-                                                          : qsTrc("appshell", "Page view")
-
-            navigation.panel: navPanel
-            navigation.order: 4
-
-            contentItem: Row {
-                spacing: 2
-
-                StyledIconLabel {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconCode: viewModeButton.icon
-                    font: root.iconFont
-                }
-
-                StyledIconLabel {
-                    anchors.verticalCenter: parent.verticalCenter
-                    iconCode: IconCode.SMALL_ARROW_DOWN
-                }
-            }
-
-            onClicked: {
-                viewModeMenu.toggleOpened([
-                    { id: "page", title: qsTrc("appshell", "Page view"), icon: IconCode.PAGE_VIEW,
-                        checkable: true, checked: !root.pageModel.isContinuousView },
-                    { id: "continuous", title: qsTrc("appshell", "Continuous view (horizontal)"), icon: IconCode.CONTINUOUS_VIEW,
-                        checkable: true, checked: root.pageModel.isContinuousView }
-                ])
-            }
-
-            StyledMenuLoader {
-                id: viewModeMenu
-
-                menuAnchorItem: root.Window.window ? root.Window.window.contentItem : null
-
-                onHandleMenuItem: function(itemId) {
-                    root.pageModel.isContinuousView = (itemId === "continuous")
-                }
-            }
+            navigationPanel: navPanel
+            navigationOrder: 4
         }
 
         FlatButton {
@@ -223,21 +182,24 @@ Item {
 
         FlatButton {
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.presentationButtonVisible
             width: root.buttonSize
             height: root.buttonSize
 
-            icon: root.immersive ? IconCode.APP_UNMAXIMIZE : IconCode.APP_MAXIMIZE
+            icon: IconCode.OPEN_LINK
             iconFont: root.iconFont
-            transparent: true
+            accentButton: root.pageModel.isPresentationWindowOpen
+            transparent: !root.pageModel.isPresentationWindowOpen
 
-            toolTipTitle: root.immersive ? qsTrc("appshell", "Exit full screen") : qsTrc("appshell", "Full screen")
-            accessible.checked: root.immersive
+            toolTipTitle: root.pageModel.isPresentationWindowOpen ? qsTrc("appshell", "Close presentation window")
+                                                                  : qsTrc("appshell", "Presentation window")
+            accessible.checked: root.pageModel.isPresentationWindowOpen
 
             navigation.panel: navPanel
             navigation.order: 6
 
             onClicked: {
-                root.toggleImmersiveRequested()
+                root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
             }
         }
     }

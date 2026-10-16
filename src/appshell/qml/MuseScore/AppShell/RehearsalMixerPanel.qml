@@ -40,6 +40,13 @@ Rectangle {
 
     readonly property RehearsalMixerModel mixerModel: mixer
 
+    //! Wide sidebar (2/3 of the window) to set the faders more precisely; the page sets the width
+    property bool expanded: false
+    signal expandToggled()
+
+    //! The metronome fader is shown while the metronome is enabled
+    property bool metronomeVisible: false
+
     //! The page opens the dialog to create a fader group
     signal createGroupRequested()
 
@@ -83,11 +90,29 @@ Rectangle {
     }
 
     NavigationPanel {
+        id: metronomeNavPanel
+
+        name: "RehearsalMetronome"
+        section: root.navigationSection
+        order: root.navigationOrderStart + 1
+        enabled: root.enabled && root.visible && root.metronomeVisible
+        direction: NavigationPanel.Horizontal
+        accessible.name: metronomeTitle.text
+
+        //! Scrolls the fader into view when it gets the keyboard focus
+        onActiveChanged: function(active) {
+            if (active) {
+                Utils.ensureContentVisible(flickable, Qt.rect(metronomeCard.x, metronomeCard.y, metronomeCard.width, metronomeCard.height), prv.cardSpacing)
+            }
+        }
+    }
+
+    NavigationPanel {
         id: accompanimentNavPanel
 
         name: "RehearsalAccompaniment"
         section: root.navigationSection
-        order: root.navigationOrderStart + 1
+        order: root.navigationOrderStart + 2
         enabled: accompanimentRow.visible
         direction: NavigationPanel.Horizontal
         accessible.name: accompanimentTitle.text
@@ -104,10 +129,36 @@ Rectangle {
 
         height: prv.touchSize + 2 * prv.cardSpacing
 
+        FlatButton {
+            id: expandPanelButton
+
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+
+            height: prv.touchSize
+            minWidth: prv.touchSize
+            transparent: true
+
+            icon: root.expanded ? IconCode.CHEVRON_RIGHT : IconCode.CHEVRON_LEFT
+            iconFont: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 24 })
+
+            toolTipTitle: root.expanded ? qsTrc("appshell", "Narrow the sidebar") : qsTrc("appshell", "Widen the sidebar")
+            accessible.checked: root.expanded
+
+            navigation.name: "ExpandPanelButton"
+            navigation.panel: headerNavPanel
+            navigation.order: 0
+
+            onClicked: {
+                root.expandToggled()
+            }
+        }
+
         StyledTextLabel {
             id: headerTitle
 
-            anchors.left: parent.left
+            anchors.left: expandPanelButton.right
+            anchors.leftMargin: 4
             anchors.right: newGroupButton.left
             anchors.rightMargin: prv.cardSpacing
             anchors.verticalCenter: parent.verticalCenter
@@ -167,7 +218,7 @@ Rectangle {
     Rectangle {
         id: accompanimentRow
 
-        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: prv.margins
@@ -218,6 +269,16 @@ Rectangle {
                     font: ui.theme.bodyBoldFont
                     text: accompanimentSlider.valueText
                 }
+
+                //! A double tap on the value sets the fader to 0 dB
+                MouseArea {
+                    anchors.fill: accompanimentValue
+                    anchors.margins: -8
+
+                    onDoubleClicked: {
+                        mixer.accompanimentDb = 0
+                    }
+                }
             }
 
             HorizontalVolumeSlider {
@@ -243,14 +304,62 @@ Rectangle {
         }
     }
 
+    //! While a part is shown: whether the whole score is played or only the voices of the part. The faders follow.
+    Item {
+        id: scopeRow
+
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: prv.margins
+        anchors.rightMargin: prv.margins
+
+        height: visible ? prv.touchSize + prv.cardSpacing : 0
+        visible: mixer.isPartShown
+
+        FlatButton {
+            id: scopeButton
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+
+            height: prv.touchSize
+
+            accentButton: mixer.shownPartOnly
+
+            //! The label of the button itself is cut ("Playing: whole s...") when it changes: it is shown by an item of its own
+            contentItem: Component {
+                StyledTextLabel {
+                    text: mixer.shownPartOnly ? qsTrc("appshell", "Playing: shown part only") : qsTrc("appshell", "Playing: whole score")
+                    font: ui.theme.bodyFont
+                    color: mixer.shownPartOnly ? "white" : ui.theme.fontPrimaryColor
+                }
+            }
+
+            toolTipTitle: qsTrc("appshell", "Voices to play")
+            toolTipDescription: mixer.shownPartOnly ? qsTrc("appshell", "Only the voices of the shown part are heard. Tap to play the whole score.")
+                                                    : qsTrc("appshell", "All voices of the score are heard. Tap to play only the voices of the shown part.")
+            accessible.checked: mixer.shownPartOnly
+
+            navigation.name: "PlaybackScopeButton"
+            navigation.panel: headerNavPanel
+            navigation.order: 3
+
+            onClicked: {
+                mixer.shownPartOnly = !mixer.shownPartOnly
+            }
+        }
+    }
+
     StyledFlickable {
         id: flickable
 
-        anchors.top: accompanimentRow.bottom
-        anchors.topMargin: accompanimentRow.visible ? prv.cardSpacing : 0
+        anchors.top: scopeRow.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.bottom: accompanimentRow.visible ? accompanimentRow.top : parent.bottom
+        anchors.bottomMargin: accompanimentRow.visible ? prv.cardSpacing : 0
 
         contentHeight: rowsColumn.height + prv.cardSpacing
 
@@ -263,6 +372,103 @@ Rectangle {
             anchors.rightMargin: prv.margins
 
             spacing: prv.cardSpacing
+
+            //! Volume of the metronome in front of the track faders. It scrolls with them.
+            Rectangle {
+                id: metronomeCard
+
+                width: rowsColumn.width
+                height: visible ? metronomeContent.height + 2 * prv.cardSpacing : 0
+                visible: root.metronomeVisible
+
+                radius: 6
+                color: ui.theme.backgroundPrimaryColor
+                border.width: 1
+                border.color: ui.theme.strokeColor
+
+                Column {
+                    id: metronomeContent
+
+                    anchors.top: parent.top
+                    anchors.topMargin: prv.cardSpacing
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: prv.cardSpacing
+                    anchors.rightMargin: prv.margins
+
+                    spacing: 4
+
+                    Item {
+                        width: parent.width
+                        height: 32
+
+                        StyledIconLabel {
+                            id: metronomeIcon
+
+                            anchors.left: parent.left
+                            anchors.leftMargin: 4
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            iconCode: IconCode.METRONOME
+                            font: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 24 })
+                        }
+
+                        StyledTextLabel {
+                            id: metronomeTitle
+
+                            anchors.left: metronomeIcon.right
+                            anchors.leftMargin: prv.margins
+                            anchors.right: metronomeValue.left
+                            anchors.rightMargin: 6
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            horizontalAlignment: Text.AlignLeft
+                            font: ui.theme.bodyBoldFont
+                            text: qsTrc("appshell", "Metronome")
+                        }
+
+                        StyledTextLabel {
+                            id: metronomeValue
+
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            font: ui.theme.bodyBoldFont
+                            text: metronomeSlider.valueText
+                        }
+
+                        //! A double tap on the value sets the fader to 0 dB
+                        MouseArea {
+                            anchors.fill: metronomeValue
+                            anchors.margins: -8
+
+                            onDoubleClicked: {
+                                mixer.metronomeDb = 0
+                            }
+                        }
+                    }
+
+                    HorizontalVolumeSlider {
+                        id: metronomeSlider
+
+                        width: parent.width
+
+                        from: mixer.minVolumeDb
+                        to: mixer.maxAbsoluteDb
+                        defaultDb: mixer.metronomeScoreDb
+                        volumeDb: mixer.metronomeDb
+
+                        navigation.name: "MetronomeSlider"
+                        navigation.panel: metronomeNavPanel
+                        navigation.order: 1
+                        navigation.accessible.name: metronomeTitle.text + " " + metronomeValue.text
+
+                        onVolumeDbMoved: function(db) {
+                            mixer.metronomeDb = db
+                        }
+                    }
+                }
+            }
 
             Repeater {
                 model: mixer
@@ -277,6 +483,7 @@ Rectangle {
                     required property bool isSolo
                     required property real volumeDb
                     required property real effectiveDb
+                    required property real scoreDb
                     required property bool groupOn
                     required property bool groupSolo
                     required property bool isExpanded
@@ -294,7 +501,7 @@ Rectangle {
 
                         name: "RehearsalMixerRow" + row.index
                         section: root.navigationSection
-                        order: root.navigationOrderStart + 2 + row.index
+                        order: root.navigationOrderStart + 3 + row.index
                         enabled: root.enabled && root.visible
                         direction: NavigationPanel.Horizontal
                         accessible.name: row.title
@@ -556,6 +763,17 @@ Rectangle {
                                     font: ui.theme.bodyBoldFont
                                     text: volumeSlider.valueText
                                 }
+
+                                //! A double tap on the value sets the fader to 0 dB
+                                MouseArea {
+                                    anchors.fill: volumeLabel
+                                    anchors.margins: -8
+                                    enabled: row.isOn
+
+                                    onDoubleClicked: {
+                                        mixer.setVolumeDb(row.index, 0)
+                                    }
+                                }
                             }
 
                             HorizontalVolumeSlider {
@@ -565,8 +783,9 @@ Rectangle {
 
                                 enabled: row.isOn
                                 from: mixer.minVolumeDb
-                                to: mixer.maxVolumeDb
-                                defaultDb: mixer.maxVolumeDb
+                                to: row.isGroup ? mixer.maxVolumeDb : mixer.maxAbsoluteDb
+                                //! A double click returns to the volume in the score (to no offset for a group)
+                                defaultDb: row.isGroup ? mixer.maxVolumeDb : row.scoreDb
                                 volumeDb: row.volumeDb
 
                                 navigation.name: "VolumeSlider"

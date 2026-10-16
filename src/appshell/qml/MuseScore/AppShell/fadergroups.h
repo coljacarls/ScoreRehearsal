@@ -27,6 +27,9 @@
 #include "playback/internal/rehearsalmix.h"
 
 namespace mu::appshell {
+//! The track faders are absolute: they set the volume of the track itself, up to the maximum of the audio engine
+constexpr float ABSOLUTE_VOLUME_DB_MAX = 12.f;
+
 //! A fader group of the rehearsal page: one fader, mute and solo for several tracks
 struct FaderGroup {
     int id = 0;
@@ -40,7 +43,7 @@ struct FaderGroup {
 
 //! The member state as seen by the mix:
 //! on = member on && group on; solo = member solo || group solo;
-//! volume = member volume + group volume, clamped to the fader range
+//! volume = member volume (absolute) + group volume (an offset), clamped to the absolute range
 playback::RehearsalTrackState applyFaderGroup(const playback::RehearsalTrackState& member, const FaderGroup& group);
 
 //! Applies each group to its members; tracks without a group are returned unchanged

@@ -25,7 +25,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <unordered_map>
+
+#include <QJsonArray>
+#include <QJsonObject>
 
 #include "async/notifylist.h"
 #include "log.h"
@@ -36,7 +40,10 @@
 #include "notation/inotationplayback.h"
 
 #include "project/inotationproject.h"
+#include "project/iprojectaudiosettings.h"
 #include "project/types/projecturis.h"
+
+#include "rehearsalsessionstore.h"
 
 using namespace muse;
 using namespace mu::appshell;
@@ -52,6 +59,43 @@ static constexpr int INVALID_MIXER_INDEX = -1;
 static float normalizedMixerDb(float db)
 {
     return std::clamp(std::round(db * 10.f) / 10.f, REHEARSAL_VOLUME_DB_MIN, REHEARSAL_VOLUME_DB_MAX);
+}
+
+static float normalizedAbsoluteDb(float db)
+{
+    return std::clamp(std::round(db * 10.f) / 10.f, REHEARSAL_VOLUME_DB_MIN, ABSOLUTE_VOLUME_DB_MAX);
+}
+
+//! The volume of a track as stored in the score
+static float scoreVolumeDb(const INotationProjectPtr& project, const InstrumentTrackId& instrumentTrackId)
+{
+    const AudioOutputParams& params = project->audioSettings()->trackOutputParams(instrumentTrackId);
+    return normalizedAbsoluteDb(params.control().volume.evaluateAt(muse::secs_t(0.0), VOLUME_DB_MIN, VOLUME_DB_MAX).raw());
+}
+
+namespace {
+struct AbsoluteTrackMix {
+    bool audible = true;
+    float volumeDb = 0.f; // absolute volume the track is supposed to have
+};
+
+//! The faders are absolute: the volume of a track is its fader (plus the offset of its group), and the
+//! accompaniment level lowers the tracks that are not solo while there is a solo
+AbsoluteTrackMix absoluteTrackMix(const RehearsalTrackState& track, bool anySolo, float accompanimentDb)
+{
+    const auto isSilent = [](float db) { return db <= REHEARSAL_VOLUME_DB_MIN; };
+
+    const float faderDb = std::clamp(track.volumeDb, REHEARSAL_VOLUME_DB_MIN, ABSOLUTE_VOLUME_DB_MAX);
+    const bool isAccompaniment = anySolo && !track.isSolo;
+    const float accompaniment = std::clamp(accompanimentDb, REHEARSAL_VOLUME_DB_MIN, REHEARSAL_VOLUME_DB_MAX);
+
+    const float volumeDb = faderDb + (isAccompaniment ? accompaniment : 0.f);
+
+    AbsoluteTrackMix mix;
+    mix.audible = track.isOn && !isSilent(faderDb) && !(isAccompaniment && isSilent(accompaniment)) && !isSilent(volumeDb);
+    mix.volumeDb = std::max(volumeDb, REHEARSAL_VOLUME_DB_MIN);
+    return mix;
+}
 }
 
 //! Track names come XML-escaped from the score (e.g. "F Horn 1 &amp; 3"); the faders show plain text
@@ -74,8 +118,138 @@ struct RehearsalMixerSession {
     std::vector<FaderGroup> groups;
     int nextGroupId = 1;
     float accompanimentDb = REHEARSAL_VOLUME_DB_MIN; // silent the first time in a session
+    std::optional<float> metronomeDb; // unset until the user moves the fader
+    bool shownPartOnly = false; // play only the tracks of the shown part
+    //! Track faders of sessions from before the faders were absolute: offsets to the volume in the score
+    std::unordered_map<InstrumentTrackId, float> legacyRelativeDb;
 };
 
+QString trackKey(const InstrumentTrackId& id)
+{
+    return QString::fromStdString(id.partId.toStdString()) + QLatin1Char('|') + id.instrumentId.toQString();
+}
+
+std::optional<InstrumentTrackId> trackIdFromKey(const QString& key)
+{
+    const int separator = key.indexOf(QLatin1Char('|'));
+    if (separator <= 0) {
+        return std::nullopt;
+    }
+
+    bool ok = false;
+    const quint64 partId = key.left(separator).toULongLong(&ok);
+    if (!ok) {
+        return std::nullopt;
+    }
+
+    return InstrumentTrackId { muse::ID(static_cast<uint64_t>(partId)), String::fromQString(key.mid(separator + 1)) };
+}
+
+QJsonObject mixerToJson(const RehearsalMixerSession& session)
+{
+    QJsonObject tracks;
+    for (const auto& [id, state] : session.tracks) {
+        tracks[trackKey(id)] = QJsonObject {
+            { "on", state.isOn },
+            { "solo", state.isSolo },
+            { "absoluteDb", static_cast<double>(state.volumeDb) }
+        };
+    }
+
+    QJsonArray groups;
+    for (const FaderGroup& group : session.groups) {
+        QJsonArray members;
+        for (const InstrumentTrackId& member : group.members) {
+            members.append(trackKey(member));
+        }
+
+        groups.append(QJsonObject {
+            { "id", group.id },
+            { "name", group.name },
+            { "on", group.isOn },
+            { "solo", group.isSolo },
+            { "volumeDb", static_cast<double>(group.volumeDb) },
+            { "expanded", group.isExpanded },
+            { "members", members }
+        });
+    }
+
+    QJsonObject result {
+        { "accompanimentDb", static_cast<double>(session.accompanimentDb) },
+        { "nextGroupId", session.nextGroupId },
+        { "shownPartOnly", session.shownPartOnly },
+        { "tracks", tracks },
+        { "groups", groups }
+    };
+
+    if (session.metronomeDb) {
+        result["metronomeDb"] = static_cast<double>(*session.metronomeDb);
+    }
+
+    return result;
+}
+
+void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
+{
+    if (json.isEmpty()) {
+        return;
+    }
+
+    session.accompanimentDb = normalizedMixerDb(static_cast<float>(json.value("accompanimentDb").toDouble(REHEARSAL_VOLUME_DB_MIN)));
+    session.nextGroupId = std::max(1, json.value("nextGroupId").toInt(1));
+    session.shownPartOnly = json.value("shownPartOnly").toBool(false);
+
+    if (json.contains("metronomeDb")) {
+        session.metronomeDb = normalizedAbsoluteDb(static_cast<float>(json.value("metronomeDb").toDouble()));
+    }
+
+    const QJsonObject tracks = json.value("tracks").toObject();
+    for (auto it = tracks.begin(); it != tracks.end(); ++it) {
+        const std::optional<InstrumentTrackId> id = trackIdFromKey(it.key());
+        if (!id) {
+            continue;
+        }
+
+        const QJsonObject o = it.value().toObject();
+        RehearsalTrackState state;
+        state.instrumentTrackId = *id;
+        state.isOn = o.value("on").toBool(true);
+        state.isSolo = o.value("solo").toBool(false);
+        if (o.contains("absoluteDb")) {
+            state.volumeDb = normalizedAbsoluteDb(static_cast<float>(o.value("absoluteDb").toDouble()));
+        } else {
+            //! Made before the faders were absolute: converted when the track is known
+            state.volumeDb = normalizedMixerDb(static_cast<float>(o.value("volumeDb").toDouble(REHEARSAL_VOLUME_DB_MAX)));
+            session.legacyRelativeDb[*id] = state.volumeDb;
+        }
+        session.tracks[*id] = state;
+    }
+
+    for (const QJsonValue& value : json.value("groups").toArray()) {
+        const QJsonObject o = value.toObject();
+
+        FaderGroup group;
+        group.id = o.value("id").toInt();
+        group.name = o.value("name").toString();
+        group.isOn = o.value("on").toBool(true);
+        group.isSolo = o.value("solo").toBool(false);
+        group.volumeDb = normalizedMixerDb(static_cast<float>(o.value("volumeDb").toDouble(REHEARSAL_VOLUME_DB_MAX)));
+        group.isExpanded = o.value("expanded").toBool(false);
+
+        for (const QJsonValue& member : o.value("members").toArray()) {
+            if (const std::optional<InstrumentTrackId> id = trackIdFromKey(member.toString())) {
+                group.members.push_back(*id);
+            }
+        }
+
+        if (!group.name.isEmpty() && !group.members.empty()) {
+            session.nextGroupId = std::max(session.nextGroupId, group.id + 1);
+            session.groups.push_back(std::move(group));
+        }
+    }
+}
+
+//! The in-memory state of the open project, loaded from the stored session of its file
 RehearsalMixerSession& mixerSessionFor(const INotationProjectPtr& project)
 {
     static std::vector<RehearsalMixerSession> s_sessions;
@@ -92,6 +266,13 @@ RehearsalMixerSession& mixerSessionFor(const INotationProjectPtr& project)
 
     RehearsalMixerSession& session = s_sessions.emplace_back();
     session.project = project;
+
+    if (project) {
+        RehearsalSessionStore& store = RehearsalSessionStore::instance();
+        const RehearsalSession& stored = store.ensureForPath(project->path().toQString(), project->displayName());
+        mixerFromJson(stored.mixer, session);
+    }
+
     return session;
 }
 }
@@ -126,6 +307,10 @@ void RehearsalMixerModel::componentComplete()
     context()->currentProjectChanged().onNotify(this, [this]() {
         reload();
         updateMixOverride();
+    });
+
+    context()->currentNotationChanged().onNotify(this, [this]() {
+        updateScope();
     });
 
     interactive()->currentUri().ch.onReceive(this, [this](const Uri&) {
@@ -177,6 +362,8 @@ QVariant RehearsalMixerModel::data(const QModelIndex& index, int role) const
         return group->volumeDb;
     case EffectiveDbRole:
         return track ? effectiveDb(row.trackIndex) : REHEARSAL_VOLUME_DB_MIN;
+    case ScoreDbRole:
+        return track ? track->scoreDb : 0.0;
     case GroupOnRole:
         return group ? group->isOn : true;
     case GroupSoloRole:
@@ -189,7 +376,7 @@ QVariant RehearsalMixerModel::data(const QModelIndex& index, int role) const
         }
         int count = 0;
         for (const InstrumentTrackId& member : group->members) {
-            if (indexOfTrack(member) != INVALID_MIXER_INDEX) {
+            if (indexOfTrack(member) != INVALID_MIXER_INDEX && isInScope(member)) {
                 ++count;
             }
         }
@@ -214,6 +401,7 @@ QHash<int, QByteArray> RehearsalMixerModel::roleNames() const
         { IsSoloRole, "isSolo" },
         { VolumeDbRole, "volumeDb" },
         { EffectiveDbRole, "effectiveDb" },
+        { ScoreDbRole, "scoreDb" },
         { GroupOnRole, "groupOn" },
         { GroupSoloRole, "groupSolo" },
         { IsExpandedRole, "isExpanded" },
@@ -246,6 +434,96 @@ void RehearsalMixerModel::setAccompanimentDb(float db)
     onValuesChanged();
 }
 
+float RehearsalMixerModel::metronomeDb() const
+{
+    return m_metronomeDb;
+}
+
+void RehearsalMixerModel::setMetronomeDb(float db)
+{
+    db = normalizedAbsoluteDb(db);
+    if (m_metronomeDb == db) {
+        return;
+    }
+
+    m_metronomeDb = db;
+    emit metronomeDbChanged();
+
+    if (const INotationProjectPtr project = context()->currentProject()) {
+        mixerSessionFor(project).metronomeDb = db;
+    }
+
+    applyMetronomeDb();
+    saveSession();
+}
+
+std::optional<TrackId> RehearsalMixerModel::metronomeTrackId() const
+{
+    const INotationProjectPtr project = context()->currentProject();
+    if (!project || !controller()->isPlaybackInited()) {
+        return std::nullopt;
+    }
+
+    const IPlaybackController::InstrumentTrackIdMap& instrumentTracks = controller()->instrumentTrackIdMap();
+    auto it = instrumentTracks.find(project->masterNotation()->playback()->metronomeTrackId());
+    if (it == instrumentTracks.cend()) {
+        return std::nullopt;
+    }
+
+    return it->second;
+}
+
+void RehearsalMixerModel::loadMetronome()
+{
+    const std::optional<TrackId> trackId = metronomeTrackId();
+    const INotationProjectPtr project = context()->currentProject();
+    if (!trackId || !project) {
+        return;
+    }
+
+    RehearsalMixerSession& session = mixerSessionFor(project);
+    m_metronomeScoreDb = scoreVolumeDb(project, project->masterNotation()->playback()->metronomeTrackId());
+
+    if (session.metronomeDb) {
+        //! The volume of the session replaces the one of the score, also when the track is created again
+        m_metronomeDb = *session.metronomeDb;
+        applyMetronomeDb();
+    } else {
+        //! First time: the fader starts at the volume of the score
+        m_metronomeDb = m_metronomeScoreDb;
+        session.metronomeDb = m_metronomeDb;
+        saveSession();
+    }
+
+    emit metronomeDbChanged();
+}
+
+void RehearsalMixerModel::applyMetronomeDb()
+{
+    const std::optional<TrackId> trackId = metronomeTrackId();
+    if (!trackId) {
+        return;
+    }
+
+    const float db = m_metronomeDb;
+    playback()->params(*trackId).onResolve(this, [this, trackId, db](const TrackParams& params) {
+        ControlParams control = params.control;
+        control.volume = volume_db_t::make(db);
+        control.muted = params.control.muted;
+        playback()->setControlParams(*trackId, control);
+    });
+}
+
+float RehearsalMixerModel::maxAbsoluteDb() const
+{
+    return ABSOLUTE_VOLUME_DB_MAX;
+}
+
+float RehearsalMixerModel::metronomeScoreDb() const
+{
+    return m_metronomeScoreDb;
+}
+
 float RehearsalMixerModel::minVolumeDb() const
 {
     return REHEARSAL_VOLUME_DB_MIN;
@@ -260,12 +538,92 @@ int RehearsalMixerModel::ungroupedTrackCount() const
 {
     int count = 0;
     for (const Track& track : m_tracks) {
-        if (groupIndexOfTrack(track.state.instrumentTrackId) == INVALID_MIXER_INDEX) {
+        if (isInScope(track.state.instrumentTrackId) && groupIndexOfTrack(track.state.instrumentTrackId) == INVALID_MIXER_INDEX) {
             ++count;
         }
     }
 
     return count;
+}
+
+bool RehearsalMixerModel::isPartShown() const
+{
+    return m_isPartShown;
+}
+
+bool RehearsalMixerModel::shownPartOnly() const
+{
+    return m_shownPartOnly;
+}
+
+bool RehearsalMixerModel::partScopeActive() const
+{
+    return m_shownPartOnly && m_isPartShown;
+}
+
+bool RehearsalMixerModel::isInScope(const InstrumentTrackId& instrumentTrackId) const
+{
+    return !partScopeActive() || std::find(m_shownPartIds.cbegin(), m_shownPartIds.cend(), instrumentTrackId.partId) != m_shownPartIds.cend();
+}
+
+bool RehearsalMixerModel::readShownPart()
+{
+    bool shown = false;
+    std::vector<muse::ID> partIds;
+
+    const INotationPtr current = context()->currentNotation();
+    const IMasterNotationPtr master = context()->currentMasterNotation();
+    if (current && master && current != master->notation() && current->parts()) {
+        shown = true;
+
+        async::NotifyList<const Part*> partList = current->parts()->partList();
+        for (const Part* part : partList) {
+            partIds.push_back(part->id());
+        }
+    }
+
+    const bool changed = shown != m_isPartShown || partIds != m_shownPartIds;
+    m_isPartShown = shown;
+    m_shownPartIds = std::move(partIds);
+    return changed;
+}
+
+//! Another part (or the full score) is shown: the faders and the sound follow when only the shown part is played
+void RehearsalMixerModel::updateScope()
+{
+    if (!readShownPart()) {
+        return;
+    }
+
+    emit scopeChanged();
+
+    if (!m_shownPartOnly) {
+        return;
+    }
+
+    rebuildRows();
+    updateHasSolo();
+    updateMixOverride();
+}
+
+void RehearsalMixerModel::setShownPartOnly(bool only)
+{
+    if (m_shownPartOnly == only) {
+        return;
+    }
+
+    m_shownPartOnly = only;
+
+    if (const INotationProjectPtr project = context()->currentProject()) {
+        mixerSessionFor(project).shownPartOnly = only;
+    }
+
+    emit scopeChanged();
+
+    rebuildRows();
+    updateHasSolo();
+    saveSession();
+    updateMixOverride();
 }
 
 void RehearsalMixerModel::setOn(int row, bool on)
@@ -306,9 +664,10 @@ void RehearsalMixerModel::setVolumeDb(int row, float db)
         return;
     }
 
-    db = normalizedMixerDb(db);
-
     const Row& r = m_rows.at(row);
+    //! The faders of the tracks are absolute, the ones of the groups are offsets
+    db = r.type == RowType::Group ? normalizedMixerDb(db) : normalizedAbsoluteDb(db);
+
     float& value = r.type == RowType::Group ? m_groups[r.groupIndex].volumeDb : m_tracks[r.trackIndex].state.volumeDb;
     if (value == db) {
         return;
@@ -318,6 +677,7 @@ void RehearsalMixerModel::setVolumeDb(int row, float db)
     onValuesChanged();
 }
 
+//! Every track sounds: nothing is muted and there is no solo that silences the others
 void RehearsalMixerModel::setAllOn()
 {
     bool changed = false;
@@ -327,11 +687,21 @@ void RehearsalMixerModel::setAllOn()
             track.state.isOn = true;
             changed = true;
         }
+
+        if (track.state.isSolo) {
+            track.state.isSolo = false;
+            changed = true;
+        }
     }
 
     for (FaderGroup& group : m_groups) {
         if (!group.isOn) {
             group.isOn = true;
+            changed = true;
+        }
+
+        if (group.isSolo) {
+            group.isSolo = false;
             changed = true;
         }
     }
@@ -391,7 +761,7 @@ QVariantList RehearsalMixerModel::ungroupedTracks() const
 
     for (size_t i = 0; i < m_tracks.size(); ++i) {
         const Track& track = m_tracks.at(i);
-        if (groupIndexOfTrack(track.state.instrumentTrackId) != INVALID_MIXER_INDEX) {
+        if (!isInScope(track.state.instrumentTrackId) || groupIndexOfTrack(track.state.instrumentTrackId) != INVALID_MIXER_INDEX) {
             continue;
         }
 
@@ -489,15 +859,20 @@ void RehearsalMixerModel::reload()
     m_tracks.clear();
     m_groups.clear();
     m_nextGroupId = 1;
+    m_shownPartOnly = false;
 
     const INotationProjectPtr project = context()->currentProject();
     float accompanimentDb = REHEARSAL_VOLUME_DB_MIN;
 
+    m_sessionLoaded = false;
+
     if (project && controller()->isPlaybackInited()) {
+        m_sessionLoaded = true;
         const RehearsalMixerSession& session = mixerSessionFor(project);
         accompanimentDb = session.accompanimentDb;
         m_groups = session.groups;
         m_nextGroupId = session.nextGroupId;
+        m_shownPartOnly = session.shownPartOnly;
 
         const IPlaybackController::InstrumentTrackIdMap& instrumentTracks = controller()->instrumentTrackIdMap();
 
@@ -509,7 +884,9 @@ void RehearsalMixerModel::reload()
         }
     }
 
+    readShownPart();
     rebuildRows();
+    emit scopeChanged();
 
     if (m_accompanimentDb != accompanimentDb) {
         m_accompanimentDb = accompanimentDb;
@@ -521,10 +898,18 @@ void RehearsalMixerModel::reload()
     for (const Track& track : m_tracks) {
         requestTitle(track.trackId);
     }
+
+    loadMetronome();
+    saveSession();
 }
 
 void RehearsalMixerModel::onTrackAdded(const TrackId trackId)
 {
+    if (trackId == metronomeTrackId()) {
+        loadMetronome();
+        return;
+    }
+
     if (indexOfTrack(trackId) != INVALID_MIXER_INDEX) {
         return;
     }
@@ -553,6 +938,7 @@ void RehearsalMixerModel::onTrackAdded(const TrackId trackId)
 
     m_tracks.insert(m_tracks.begin() + insertIndex, makeTrack(instrumentIt->first, trackId));
     rebuildRows();
+    saveSession();
 
     requestTitle(trackId);
 
@@ -636,10 +1022,19 @@ RehearsalMixerModel::Track RehearsalMixerModel::makeTrack(const InstrumentTrackI
     track.state.instrumentTrackId = instrumentTrackId;
 
     if (const INotationProjectPtr project = context()->currentProject()) {
-        const RehearsalMixerSession& session = mixerSessionFor(project);
+        RehearsalMixerSession& session = mixerSessionFor(project);
+        track.scoreDb = scoreVolumeDb(project, instrumentTrackId);
+        track.state.volumeDb = track.scoreDb; // the faders start at the volume of the score
+
         auto it = session.tracks.find(instrumentTrackId);
         if (it != session.tracks.cend()) {
             track.state = it->second;
+
+            auto legacy = session.legacyRelativeDb.find(instrumentTrackId);
+            if (legacy != session.legacyRelativeDb.end()) {
+                track.state.volumeDb = normalizedAbsoluteDb(track.scoreDb + legacy->second);
+                session.legacyRelativeDb.erase(legacy);
+            }
         }
     }
 
@@ -701,6 +1096,10 @@ std::vector<RehearsalMixerModel::Row> RehearsalMixerModel::buildRows() const
 
     //! A group takes the place of its first member present in the track list
     for (size_t trackIndex = 0; trackIndex < m_tracks.size(); ++trackIndex) {
+        if (!isInScope(m_tracks[trackIndex].state.instrumentTrackId)) {
+            continue;
+        }
+
         const int groupIndex = groupIndexOfTrack(m_tracks[trackIndex].state.instrumentTrackId);
 
         if (groupIndex == INVALID_MIXER_INDEX) {
@@ -723,7 +1122,7 @@ std::vector<RehearsalMixerModel::Row> RehearsalMixerModel::buildRows() const
 
         for (const InstrumentTrackId& member : group.members) {
             const int memberIndex = indexOfTrack(member);
-            if (memberIndex != INVALID_MIXER_INDEX) {
+            if (memberIndex != INVALID_MIXER_INDEX && isInScope(member)) {
                 rows.push_back({ RowType::Member, memberIndex, groupIndex });
             }
         }
@@ -755,7 +1154,8 @@ float RehearsalMixerModel::effectiveDb(int trackIndex) const
                                       ? track.state
                                       : applyFaderGroup(track.state, m_groups.at(groupIndex));
 
-    return rehearsalTrackEffectiveDb(state, m_hasSolo, m_accompanimentDb);
+    const AbsoluteTrackMix mix = absoluteTrackMix(state, m_hasSolo, m_accompanimentDb);
+    return mix.audible ? mix.volumeDb : REHEARSAL_VOLUME_DB_MIN;
 }
 
 void RehearsalMixerModel::onValuesChanged()
@@ -772,9 +1172,39 @@ void RehearsalMixerModel::onValuesChanged()
     updateMixOverride();
 }
 
+QStringList RehearsalMixerModel::soloPartIds() const
+{
+    return m_soloPartIds;
+}
+
 void RehearsalMixerModel::updateHasSolo()
 {
-    const bool hasSolo = hasAnySolo(effectiveTrackStates());
+    //! A solo of a track that is not played (another part is shown) does not count
+    std::vector<RehearsalTrackState> states;
+    for (const RehearsalTrackState& state : effectiveTrackStates()) {
+        if (isInScope(state.instrumentTrackId)) {
+            states.push_back(state);
+        }
+    }
+
+    QStringList soloPartIds;
+    for (const RehearsalTrackState& state : states) {
+        if (!state.isSolo) {
+            continue;
+        }
+
+        const QString partId = QString::fromStdString(state.instrumentTrackId.partId.toStdString());
+        if (!soloPartIds.contains(partId)) {
+            soloPartIds << partId;
+        }
+    }
+
+    if (m_soloPartIds != soloPartIds) {
+        m_soloPartIds = soloPartIds;
+        emit soloPartIdsChanged();
+    }
+
+    const bool hasSolo = hasAnySolo(states);
     if (m_hasSolo == hasSolo) {
         return;
     }
@@ -789,8 +1219,9 @@ void RehearsalMixerModel::updateHasSolo()
 
 void RehearsalMixerModel::saveSession()
 {
+    //! NOTE An empty model (the playback is not ready yet) would wipe the groups and faders of the session
     const INotationProjectPtr project = context()->currentProject();
-    if (!project) {
+    if (!m_sessionLoaded || !project) {
         return;
     }
 
@@ -802,6 +1233,12 @@ void RehearsalMixerModel::saveSession()
     for (const Track& track : m_tracks) {
         session.tracks[track.state.instrumentTrackId] = track.state;
     }
+
+    RehearsalSessionStore& store = RehearsalSessionStore::instance();
+    if (RehearsalSession* stored = store.findByPath(project->path().toQString())) {
+        stored->mixer = mixerToJson(session);
+        store.markChanged(stored->id);
+    }
 }
 
 bool RehearsalMixerModel::isPageActive() const
@@ -811,10 +1248,39 @@ bool RehearsalMixerModel::isPageActive() const
     return !stack.empty() && stack.front() == NOTATION_REHEARSAL_PAGE_URI;
 }
 
+//! The mix is made of offsets to the volumes in the score, so that the volume of each track becomes its absolute one
+SessionMix RehearsalMixerModel::calculateMix() const
+{
+    const std::vector<RehearsalTrackState> states = effectiveTrackStates();
+
+    std::vector<RehearsalTrackState> playedStates;
+    for (const RehearsalTrackState& state : states) {
+        if (isInScope(state.instrumentTrackId)) {
+            playedStates.push_back(state);
+        }
+    }
+
+    const bool anySolo = hasAnySolo(playedStates);
+
+    SessionMix result;
+    for (size_t i = 0; i < states.size(); ++i) {
+        //! The tracks of the parts that are not shown are not played
+        if (!isInScope(states[i].instrumentTrackId)) {
+            result[states[i].instrumentTrackId] = { false, 0.f };
+            continue;
+        }
+
+        const AbsoluteTrackMix mix = absoluteTrackMix(states[i], anySolo, m_accompanimentDb);
+        result[states[i].instrumentTrackId] = { mix.audible, mix.volumeDb - m_tracks[i].scoreDb };
+    }
+
+    return result;
+}
+
 void RehearsalMixerModel::updateMixOverride()
 {
     if (isPageActive() && context()->currentProject()) {
-        controller()->setSessionMixOverride(calculateRehearsalMix(effectiveTrackStates(), m_accompanimentDb));
+        controller()->setSessionMixOverride(calculateMix());
         m_overrideApplied = true;
         return;
     }

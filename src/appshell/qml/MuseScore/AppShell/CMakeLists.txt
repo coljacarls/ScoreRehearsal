@@ -27,19 +27,48 @@ qt_add_qml_module(appshell_qml
     SOURCES
         aboutmodel.cpp
         aboutmodel.h
+        audiosettingsmodel.cpp
+        audiosettingsmodel.h
+        chordscrubber.cpp
+        chordscrubber.h
         fadergroups.cpp
         fadergroups.h
         mainwindowtitleprovider.cpp
         mainwindowtitleprovider.h
+        offstreamplayback.h
+        pitchpipe.cpp
+        pitchpipe.h
+        presentationpaintview.cpp
+        presentationpaintview.h
+        presentationsettings.h
+        presentationsettingsmodel.cpp
+        presentationsettingsmodel.h
         rehearsalmixermodel.cpp
         rehearsalmixermodel.h
         rehearsalpagemodel.cpp
         rehearsalpagemodel.h
+        rehearsalsessionlistmodel.cpp
+        rehearsalsessionlistmodel.h
+        rehearsalsessionstore.cpp
+        rehearsalsessionstore.h
+        windowstatemodel.cpp
+        windowstatemodel.h
     QML_FILES
         AboutDialog.qml
         AppWindow.qml
+        AudioSettingsDialog.qml
         FaderGroupDialog.qml
+        LaserDrawing.qml
+        LaserHighlight.qml
+        LaserPointerButton.qml
+        PitchPipeHand.qml
+        PitchToolsPanel.qml
+        RehearsalToolButton.qml
+        RehearsalToolsPanel.qml
+        ViewModeButton.qml
+        FullScreenButton.qml
         OpenScorePlaceholder.qml
+        PresentationWindow.qml
         RehearsalControls.qml
         RehearsalMixerPanel.qml
         RehearsalNotationView.qml

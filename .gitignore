@@ -6,3 +6,5 @@
 .vscode/
 .idea/
 __pycache__/
+/logs/
+/test-assets/

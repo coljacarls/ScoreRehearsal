@@ -68,6 +68,13 @@ Item {
 
         property bool immersive: false
         property bool fullScreenSetByImmersive: false
+
+        //! Laser pointer pen: the stroke that is being drawn (a list of points in logical coordinates); the finished
+        //! strokes and the highlight are annotations in the model (saved in the session)
+        property var laserLiveStroke: []
+
+        //! Where the presentation window was the last time (e.g. on the second screen)
+        property rect presentationGeometry: Qt.rect(100, 100, 1280, 360)
     }
 
     Connections {
@@ -102,6 +109,13 @@ Item {
         order: 2
     }
 
+
+    NavigationSection {
+        id: toolsNavSec
+        name: "RehearsalTools"
+        enabled: root.visible && root.pageModel.hasProject
+        order: 3
+    }
     NavigationSection {
         id: tracksPanelNavSec
         name: "RehearsalTracksPanel"
@@ -109,7 +123,7 @@ Item {
         order: 6
     }
 
-    //! Top bar: open / title on the left, the rehearsal controls on the right
+    //! Top bar: back to the start page / title on the left, the rehearsal controls on the right
     Rectangle {
         id: topBar
 
@@ -142,32 +156,106 @@ Item {
             spacing: 8
 
             FlatButton {
-                id: openButton
+                id: homeButton
 
                 anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject
                 height: 36
 
-                icon: IconCode.OPEN_FILE
-                text: qsTrc("appshell", "Open")
+                icon: IconCode.ARROW_LEFT
+                text: qsTrc("appshell", "Home")
                 orientation: Qt.Horizontal
 
-                toolTipTitle: qsTrc("appshell", "Open a MuseScore file (.mscz, .mscx)")
+                toolTipTitle: qsTrc("appshell", "Back to the start page")
 
                 navigation.panel: topBarLeftNavPanel
                 navigation.order: 1
 
                 onClicked: {
-                    root.pageModel.openScore()
+                    root.pageModel.closeScore()
                 }
             }
 
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, topBar.width - leftRow.x - openButton.width - controls.width - menuButton.width - 64)
+                width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
+                                - presentationButton.width - viewModeButton.width - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
                 elide: Text.ElideRight
+            }
+
+            FlatButton {
+                id: presentationButton
+
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.pageModel.hasProject
+                width: 36
+                height: 36
+
+                icon: IconCode.OPEN_LINK
+                accentButton: root.pageModel.isPresentationWindowOpen
+                transparent: !root.pageModel.isPresentationWindowOpen
+
+                toolTipTitle: root.pageModel.isPresentationWindowOpen ? qsTrc("appshell", "Close presentation window")
+                                                                      : qsTrc("appshell", "Presentation window")
+                accessible.checked: root.pageModel.isPresentationWindowOpen
+
+                navigation.panel: topBarLeftNavPanel
+                navigation.order: 2
+
+                onClicked: {
+                    root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
+                }
+            }
+        }
+
+        //! Select button for the view of the score, in front of the part dropdown
+        ViewModeButton {
+            id: viewModeButton
+
+            anchors.right: partDropdown.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+
+            visible: root.pageModel.hasProject
+
+            pageModel: root.pageModel
+
+            navigationPanel: topBarLeftNavPanel
+            navigationOrder: 3
+        }
+
+        //! The full score or one of the parts defined in the score
+        StyledDropdown {
+            id: partDropdown
+
+            anchors.right: controls.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            width: 200
+            height: 36
+
+            visible: root.pageModel.hasProject
+
+            model: {
+                const items = [{ text: qsTrc("appshell", "Full score"), value: -1 }]
+                const names = root.pageModel.partNames
+                for (let i = 0; i < names.length; ++i) {
+                    items.push({ text: names[i], value: i })
+                }
+                return items
+            }
+
+            currentIndex: root.pageModel.currentPartIndex + 1
+
+            navigation.panel: topBarLeftNavPanel
+            navigation.order: 4
+            navigation.accessible.name: qsTrc("appshell", "Part")
+
+            onActivated: function(index, value) {
+                root.pageModel.selectPart(value)
             }
         }
 
@@ -181,16 +269,11 @@ Item {
             pageModel: root.pageModel
 
             visible: root.pageModel.hasProject
-            immersive: root.immersive
             sidePadding: 0
 
             navigationSection: topBarNavSec
             navigationOrderStart: 2
             navigationName: "RehearsalToolBarControls"
-
-            onToggleImmersiveRequested: {
-                root.setImmersive(!root.immersive)
-            }
         }
 
         FlatButton {
@@ -209,7 +292,7 @@ Item {
             toolTipTitle: qsTrc("appshell", "Menu")
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 2
+            navigation.order: 4
 
             onClicked: {
                 appMenu.toggleOpened([
@@ -217,6 +300,7 @@ Item {
                     { id: "fullscreen", title: qsTrc("appshell", "Full screen"), checkable: true, checked: root.pageModel.isFullScreen },
                     { id: "darktheme", title: qsTrc("appshell", "Dark theme"), checkable: true, checked: root.pageModel.isDarkTheme },
                     { },
+                    { id: "settings", title: qsTrc("appshell", "Settings…") },
                     { id: "about", title: qsTrc("appshell", "About ScoreRehearsal…") },
                     { },
                     { id: "quit", title: qsTrc("appshell", "Quit") }
@@ -233,6 +317,7 @@ Item {
                     case "close": root.pageModel.closeScore(); break
                     case "fullscreen": root.pageModel.setFullScreen(!root.pageModel.isFullScreen); break
                     case "darktheme": root.pageModel.setDarkTheme(!root.pageModel.isDarkTheme); break
+                    case "settings": audioSettingsDialog.open(); break
                     case "about": root.pageModel.showAbout(); break
                     case "quit": root.pageModel.quit(); break
                     }
@@ -264,6 +349,14 @@ Item {
             onOpenRequested: {
                 root.pageModel.openScore()
             }
+
+            onOpenSessionRequested: function(sessionId) {
+                root.pageModel.openSession(sessionId)
+            }
+
+            onRemoveSessionRequested: function(sessionId) {
+                root.pageModel.removeSession(sessionId)
+            }
         }
 
         RehearsalNotationView {
@@ -274,6 +367,50 @@ Item {
             visible: root.pageModel.hasProject
 
             viewModeOverride: root.pageModel.viewModeOverride
+
+            laserActive: root.pageModel.isLaserPointerActive
+            pitchPipeActive: root.pageModel.isPitchPipeActive
+            chordScrubActive: root.pageModel.isChordScrubActive
+            shownPartOnly: tracksPanel.mixerModel.partScopeActive
+            laserMode: root.pageModel.laserMode
+            strokes: root.pageModel.strokes
+            liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
+
+            //! Rectangle: a tap removes the frame if there is one, otherwise it creates a new frame where it hit
+            onLaserTapped: function(logicRect) {
+                if (root.pageModel.hasHighlight) {
+                    root.pageModel.clearHighlight()
+                } else {
+                    root.pageModel.setHighlight(logicRect)
+                }
+            }
+
+            onStrokeProgress: function(points) {
+                prv.laserLiveStroke = points
+            }
+
+            onStrokeFinished: function(points) {
+                root.pageModel.addStroke(points)
+                prv.laserLiveStroke = []
+            }
+
+            onHighlightEdited: function(logicRect) {
+                root.pageModel.setHighlight(logicRect)
+            }
+
+            onHighlightDeleteRequested: {
+                root.pageModel.clearHighlight()
+            }
+
+            onStrokeEdited: function(index, points) {
+                root.pageModel.setStroke(index, points)
+            }
+
+            onStrokeDeleteRequested: function(index) {
+                root.pageModel.removeStroke(index)
+            }
 
             anchors.top: parent.top
             anchors.left: parent.left
@@ -288,9 +425,15 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
 
-            width: 340
+            //! Wide: two thirds of the window, for setting the faders precisely
+            width: expanded ? Math.round(root.width * 2 / 3) : 340
 
             visible: root.pageModel.hasProject && root.pageModel.isTracksPanelVisible
+
+            onExpandToggled: {
+                expanded = !expanded
+            }
+            metronomeVisible: root.pageModel.isMetronomeEnabled
 
             navigationSection: tracksPanelNavSec
             navigationOrderStart: 1
@@ -298,6 +441,55 @@ Item {
             onCreateGroupRequested: {
                 faderGroupDialog.open()
             }
+        }
+
+        //! Floating tools over the score: hand, laser pointer and its tools
+        RehearsalToolsPanel {
+            id: toolsPanel
+
+            anchors.top: notationView.top
+            anchors.left: notationView.left
+            anchors.margins: 16
+
+            pageModel: root.pageModel
+            visible: root.pageModel.hasProject
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 1
+        }
+
+        //! Floating full screen button in the top right corner of the score
+        FullScreenButton {
+            id: fullScreenButton
+
+            anchors.top: notationView.top
+            anchors.right: notationView.right
+            anchors.margins: 16
+
+            visible: root.pageModel.hasProject
+            immersive: root.immersive
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 2
+
+            onToggleImmersiveRequested: {
+                root.setImmersive(!root.immersive)
+            }
+        }
+
+        //! Floating tools to give pitches in the bottom right corner of the score
+        PitchToolsPanel {
+            id: pitchToolsPanel
+
+            anchors.bottom: notationView.bottom
+            anchors.right: notationView.right
+            anchors.margins: 16
+
+            pageModel: root.pageModel
+            visible: root.pageModel.hasProject
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 3
         }
 
         //! Floating control bar of the immersive mode
@@ -329,18 +521,37 @@ Item {
                 anchors.centerIn: parent
 
                 pageModel: root.pageModel
-
-                immersive: root.immersive
+                viewModeButtonVisible: true
+                presentationButtonVisible: true
                 buttonSize: 40
                 sidePadding: 12
 
                 navigationSection: immersiveControlsNavSec
                 navigationOrderStart: 1
                 navigationName: "RehearsalImmersiveControls"
+            }
+        }
+    }
 
-                onToggleImmersiveRequested: {
-                    root.setImmersive(!root.immersive)
-                }
+    //! The window for the audience; the model keeps the session-wide "open" state,
+    //! so the button in either control bar (top bar, floating bar) opens and closes it
+    Loader {
+        id: presentationWindowLoader
+
+        active: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen
+
+        sourceComponent: PresentationWindow {
+            initialGeometry: prv.presentationGeometry
+            soloPartIds: tracksPanel.mixerModel.soloPartIds
+            strokes: root.pageModel.strokes
+            liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
+            pitchRects: notationView.soundingRects
+
+            onCloseRequested: function(geometry) {
+                prv.presentationGeometry = geometry
+                root.pageModel.isPresentationWindowOpen = false
             }
         }
     }
@@ -361,6 +572,23 @@ Item {
 
         mixerModel: tracksPanel.mixerModel
         navigationSection: faderGroupDialogNavSec
+    }
+
+    NavigationSection {
+        id: audioSettingsNavSec
+        name: "AudioSettingsDialog"
+        enabled: audioSettingsDialog.visible
+        order: 8
+    }
+
+    //! Modal settings dialog (audio driver and buffer size), over the whole page
+    AudioSettingsDialog {
+        id: audioSettingsDialog
+
+        anchors.fill: parent
+        z: 100
+
+        navigationSection: audioSettingsNavSec
     }
 
     //! Drag & drop of score files anywhere on the page
