@@ -269,6 +269,16 @@ Rectangle {
                     font: ui.theme.bodyBoldFont
                     text: accompanimentSlider.valueText
                 }
+
+                //! A double tap on the value sets the fader to 0 dB
+                MouseArea {
+                    anchors.fill: accompanimentValue
+                    anchors.margins: -8
+
+                    onDoubleClicked: {
+                        mixer.accompanimentDb = 0
+                    }
+                }
             }
 
             HorizontalVolumeSlider {
@@ -377,6 +387,16 @@ Rectangle {
 
                             font: ui.theme.bodyBoldFont
                             text: metronomeSlider.valueText
+                        }
+
+                        //! A double tap on the value sets the fader to 0 dB
+                        MouseArea {
+                            anchors.fill: metronomeValue
+                            anchors.margins: -8
+
+                            onDoubleClicked: {
+                                mixer.metronomeDb = 0
+                            }
                         }
                     }
 
@@ -694,6 +714,17 @@ Rectangle {
 
                                     font: ui.theme.bodyBoldFont
                                     text: volumeSlider.valueText
+                                }
+
+                                //! A double tap on the value sets the fader to 0 dB
+                                MouseArea {
+                                    anchors.fill: volumeLabel
+                                    anchors.margins: -8
+                                    enabled: row.isOn
+
+                                    onDoubleClicked: {
+                                        mixer.setVolumeDb(row.index, 0)
+                                    }
                                 }
                             }
 
