@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "settings.h"
 
 namespace mu::appshell {
@@ -30,9 +32,21 @@ constexpr double MAX_STAFF_HEIGHT_PERCENT_MIN = 5.0;
 constexpr double MAX_STAFF_HEIGHT_PERCENT_MAX = 100.0;
 constexpr double MAX_STAFF_HEIGHT_PERCENT_DEFAULT = 17.9;
 
+//! Darkness of the shade over what is not highlighted (unlit staves of a solo part, outside of the laser
+//! pointer frame), in percent
+constexpr double SHADE_PERCENT_MIN = 0.0;
+constexpr double SHADE_PERCENT_MAX = 90.0;
+constexpr double SHADE_PERCENT_DEFAULT = 35.0;
+
 inline const muse::Settings::Key& maxStaffHeightKey()
 {
     static const muse::Settings::Key key("appshell", "presentation/maxStaffHeightPercent");
+    return key;
+}
+
+inline const muse::Settings::Key& shadeKey()
+{
+    static const muse::Settings::Key key("appshell", "presentation/shadePercent");
     return key;
 }
 
@@ -41,5 +55,12 @@ inline double maxStaffHeightPercent()
     muse::Settings* s = muse::settings();
     s->setDefaultValue(maxStaffHeightKey(), muse::Val(MAX_STAFF_HEIGHT_PERCENT_DEFAULT));
     return s->value(maxStaffHeightKey()).toDouble();
+}
+
+inline double shadePercent()
+{
+    muse::Settings* s = muse::settings();
+    s->setDefaultValue(shadeKey(), muse::Val(SHADE_PERCENT_DEFAULT));
+    return std::clamp(s->value(shadeKey()).toDouble(), SHADE_PERCENT_MIN, SHADE_PERCENT_MAX);
 }
 }

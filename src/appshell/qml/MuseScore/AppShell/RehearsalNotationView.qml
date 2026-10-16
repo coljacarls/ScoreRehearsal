@@ -26,6 +26,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 import MuseScore.NotationScene
+import MuseScore.AppShell
 
 Item {
     id: root
@@ -87,11 +88,16 @@ Item {
         }
     }
 
+    PresentationSettingsModel {
+        id: settings
+    }
+
     LaserHighlight {
         id: laser
 
         anchors.fill: parent
 
         area: root.viewArea
+        shadeColor: Qt.rgba(0, 0, 0, settings.shadePercent / 100)
     }
 }

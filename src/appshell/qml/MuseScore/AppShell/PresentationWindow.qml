@@ -135,12 +135,17 @@ Window {
         anchors.fill: parent
 
         area: scoreView.highlightRect
+        shadeColor: prv.shadeColor
+    }
+
+    PresentationSettingsModel {
+        id: settings
     }
 
     QtObject {
         id: prv
 
-        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.45)
+        readonly property color shadeColor: Qt.rgba(0, 0, 0, settings.shadePercent / 100)
     }
 
     MouseArea {
