@@ -40,6 +40,9 @@ Rectangle {
 
     readonly property RehearsalMixerModel mixerModel: mixer
 
+    //! The metronome fader is shown while the metronome is enabled
+    property bool metronomeVisible: false
+
     //! The page opens the dialog to create a fader group
     signal createGroupRequested()
 
@@ -83,11 +86,29 @@ Rectangle {
     }
 
     NavigationPanel {
+        id: metronomeNavPanel
+
+        name: "RehearsalMetronome"
+        section: root.navigationSection
+        order: root.navigationOrderStart + 1
+        enabled: root.enabled && root.visible && root.metronomeVisible
+        direction: NavigationPanel.Horizontal
+        accessible.name: metronomeTitle.text
+
+        //! Scrolls the fader into view when it gets the keyboard focus
+        onActiveChanged: function(active) {
+            if (active) {
+                Utils.ensureContentVisible(flickable, Qt.rect(metronomeCard.x, metronomeCard.y, metronomeCard.width, metronomeCard.height), prv.cardSpacing)
+            }
+        }
+    }
+
+    NavigationPanel {
         id: accompanimentNavPanel
 
         name: "RehearsalAccompaniment"
         section: root.navigationSection
-        order: root.navigationOrderStart + 1
+        order: root.navigationOrderStart + 2
         enabled: accompanimentRow.visible
         direction: NavigationPanel.Horizontal
         accessible.name: accompanimentTitle.text
@@ -264,6 +285,93 @@ Rectangle {
 
             spacing: prv.cardSpacing
 
+            //! Volume of the metronome in front of the track faders. It scrolls with them.
+            Rectangle {
+                id: metronomeCard
+
+                width: rowsColumn.width
+                height: visible ? metronomeContent.height + 2 * prv.cardSpacing : 0
+                visible: root.metronomeVisible
+
+                radius: 6
+                color: ui.theme.backgroundPrimaryColor
+                border.width: 1
+                border.color: ui.theme.strokeColor
+
+                Column {
+                    id: metronomeContent
+
+                    anchors.top: parent.top
+                    anchors.topMargin: prv.cardSpacing
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: prv.cardSpacing
+                    anchors.rightMargin: prv.margins
+
+                    spacing: 4
+
+                    Item {
+                        width: parent.width
+                        height: 32
+
+                        StyledIconLabel {
+                            id: metronomeIcon
+
+                            anchors.left: parent.left
+                            anchors.leftMargin: 4
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            iconCode: IconCode.METRONOME
+                            font: Qt.font({ family: ui.theme.iconsFont.family, pixelSize: 24 })
+                        }
+
+                        StyledTextLabel {
+                            id: metronomeTitle
+
+                            anchors.left: metronomeIcon.right
+                            anchors.leftMargin: prv.margins
+                            anchors.right: metronomeValue.left
+                            anchors.rightMargin: 6
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            horizontalAlignment: Text.AlignLeft
+                            font: ui.theme.bodyBoldFont
+                            text: qsTrc("appshell", "Metronome")
+                        }
+
+                        StyledTextLabel {
+                            id: metronomeValue
+
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            font: ui.theme.bodyBoldFont
+                            text: metronomeSlider.valueText
+                        }
+                    }
+
+                    HorizontalVolumeSlider {
+                        id: metronomeSlider
+
+                        width: parent.width
+
+                        from: mixer.minVolumeDb
+                        to: mixer.maxVolumeDb
+                        defaultDb: mixer.maxVolumeDb
+                        volumeDb: mixer.metronomeDb
+
+                        navigation.name: "MetronomeSlider"
+                        navigation.panel: metronomeNavPanel
+                        navigation.order: 1
+                        navigation.accessible.name: metronomeTitle.text + " " + metronomeValue.text
+
+                        onVolumeDbMoved: function(db) {
+                            mixer.metronomeDb = db
+                        }
+                    }
+                }
+            }
+
             Repeater {
                 model: mixer
 
@@ -294,7 +402,7 @@ Rectangle {
 
                         name: "RehearsalMixerRow" + row.index
                         section: root.navigationSection
-                        order: root.navigationOrderStart + 2 + row.index
+                        order: root.navigationOrderStart + 3 + row.index
                         enabled: root.enabled && root.visible
                         direction: NavigationPanel.Horizontal
                         accessible.name: row.title

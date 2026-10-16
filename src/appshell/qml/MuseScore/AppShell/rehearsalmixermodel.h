@@ -25,6 +25,8 @@
 
 #include <QAbstractListModel>
 #include <QQmlParserStatus>
+#include <optional>
+
 #include <QVariantList>
 #include <qqmlintegration.h>
 
@@ -54,6 +56,7 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_PROPERTY(bool hasSolo READ hasSolo NOTIFY hasSoloChanged)
     Q_PROPERTY(QStringList soloPartIds READ soloPartIds NOTIFY soloPartIdsChanged)
     Q_PROPERTY(float accompanimentDb READ accompanimentDb WRITE setAccompanimentDb NOTIFY accompanimentDbChanged)
+    Q_PROPERTY(float metronomeDb READ metronomeDb WRITE setMetronomeDb NOTIFY metronomeDbChanged)
     Q_PROPERTY(float minVolumeDb READ minVolumeDb CONSTANT)
     Q_PROPERTY(float maxVolumeDb READ maxVolumeDb CONSTANT)
     Q_PROPERTY(int ungroupedTrackCount READ ungroupedTrackCount NOTIFY structureChanged)
@@ -94,6 +97,10 @@ public:
     float accompanimentDb() const;
     void setAccompanimentDb(float db);
 
+    //! Volume of the metronome in dB (the metronome is not part of the rehearsal mix)
+    float metronomeDb() const;
+    void setMetronomeDb(float db);
+
     float minVolumeDb() const;
     float maxVolumeDb() const;
 
@@ -117,6 +124,7 @@ signals:
     void hasSoloChanged();
     void soloPartIdsChanged();
     void accompanimentDbChanged();
+    void metronomeDbChanged();
     void structureChanged();
 
 private:
@@ -165,6 +173,11 @@ private:
     void updateHasSolo();
     void saveSession();
 
+    std::optional<muse::audio::TrackId> metronomeTrackId() const;
+    //! Reads the volume of the metronome track, or applies the one of the session
+    void loadMetronome();
+    void applyMetronomeDb();
+
     bool isPageActive() const;
     void updateMixOverride();
 
@@ -173,6 +186,7 @@ private:
     std::vector<Row> m_rows;
     int m_nextGroupId = 1;
     float m_accompanimentDb = playback::REHEARSAL_VOLUME_DB_MIN;
+    float m_metronomeDb = 0.f;
     bool m_hasSolo = false;
     QStringList m_soloPartIds;
     bool m_overrideApplied = false;

@@ -58,6 +58,8 @@ qt_add_qml_module(appshell_qml
         LaserPointerButton.qml
         RehearsalToolButton.qml
         RehearsalToolsPanel.qml
+        ViewModeButton.qml
+        FullScreenButton.qml
         OpenScorePlaceholder.qml
         PresentationWindow.qml
         RehearsalControls.qml

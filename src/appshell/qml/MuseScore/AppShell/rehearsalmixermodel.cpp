@@ -80,6 +80,7 @@ struct RehearsalMixerSession {
     std::vector<FaderGroup> groups;
     int nextGroupId = 1;
     float accompanimentDb = REHEARSAL_VOLUME_DB_MIN; // silent the first time in a session
+    std::optional<float> metronomeDb; // unset until the user moves the fader
 };
 
 QString trackKey(const InstrumentTrackId& id)
@@ -132,12 +133,18 @@ QJsonObject mixerToJson(const RehearsalMixerSession& session)
         });
     }
 
-    return QJsonObject {
+    QJsonObject result {
         { "accompanimentDb", static_cast<double>(session.accompanimentDb) },
         { "nextGroupId", session.nextGroupId },
         { "tracks", tracks },
         { "groups", groups }
     };
+
+    if (session.metronomeDb) {
+        result["metronomeDb"] = static_cast<double>(*session.metronomeDb);
+    }
+
+    return result;
 }
 
 void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
@@ -148,6 +155,10 @@ void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
 
     session.accompanimentDb = normalizedMixerDb(static_cast<float>(json.value("accompanimentDb").toDouble(REHEARSAL_VOLUME_DB_MIN)));
     session.nextGroupId = std::max(1, json.value("nextGroupId").toInt(1));
+
+    if (json.contains("metronomeDb")) {
+        session.metronomeDb = normalizedMixerDb(static_cast<float>(json.value("metronomeDb").toDouble()));
+    }
 
     const QJsonObject tracks = json.value("tracks").toObject();
     for (auto it = tracks.begin(); it != tracks.end(); ++it) {
@@ -365,6 +376,87 @@ void RehearsalMixerModel::setAccompanimentDb(float db)
     emit accompanimentDbChanged();
 
     onValuesChanged();
+}
+
+float RehearsalMixerModel::metronomeDb() const
+{
+    return m_metronomeDb;
+}
+
+void RehearsalMixerModel::setMetronomeDb(float db)
+{
+    db = normalizedMixerDb(db);
+    if (m_metronomeDb == db) {
+        return;
+    }
+
+    m_metronomeDb = db;
+    emit metronomeDbChanged();
+
+    if (const INotationProjectPtr project = context()->currentProject()) {
+        mixerSessionFor(project).metronomeDb = db;
+    }
+
+    applyMetronomeDb();
+    saveSession();
+}
+
+std::optional<TrackId> RehearsalMixerModel::metronomeTrackId() const
+{
+    const INotationProjectPtr project = context()->currentProject();
+    if (!project || !controller()->isPlaybackInited()) {
+        return std::nullopt;
+    }
+
+    const IPlaybackController::InstrumentTrackIdMap& instrumentTracks = controller()->instrumentTrackIdMap();
+    auto it = instrumentTracks.find(project->masterNotation()->playback()->metronomeTrackId());
+    if (it == instrumentTracks.cend()) {
+        return std::nullopt;
+    }
+
+    return it->second;
+}
+
+void RehearsalMixerModel::loadMetronome()
+{
+    const std::optional<TrackId> trackId = metronomeTrackId();
+    const INotationProjectPtr project = context()->currentProject();
+    if (!trackId || !project) {
+        return;
+    }
+
+    const std::optional<float> sessionDb = mixerSessionFor(project).metronomeDb;
+    if (sessionDb) {
+        //! The metronome track is created again when the score is reopened: bring back the volume of the session
+        m_metronomeDb = *sessionDb;
+        emit metronomeDbChanged();
+        applyMetronomeDb();
+        return;
+    }
+
+    //! Not touched in this session: show the volume the metronome has
+    playback()->params(*trackId).onResolve(this, [this](const TrackParams& params) {
+        const float db = normalizedMixerDb(params.control.volume.evaluateAt(0.0, VOLUME_DB_MIN, VOLUME_DB_MAX).raw());
+        if (m_metronomeDb != db) {
+            m_metronomeDb = db;
+            emit metronomeDbChanged();
+        }
+    });
+}
+
+void RehearsalMixerModel::applyMetronomeDb()
+{
+    const std::optional<TrackId> trackId = metronomeTrackId();
+    if (!trackId) {
+        return;
+    }
+
+    const float db = m_metronomeDb;
+    playback()->params(*trackId).onResolve(this, [this, trackId, db](const TrackParams& params) {
+        ControlParams control = params.control;
+        control.volume = volume_db_t::make(db);
+        playback()->setControlParams(*trackId, control);
+    });
 }
 
 float RehearsalMixerModel::minVolumeDb() const
@@ -642,10 +734,17 @@ void RehearsalMixerModel::reload()
     for (const Track& track : m_tracks) {
         requestTitle(track.trackId);
     }
+
+    loadMetronome();
 }
 
 void RehearsalMixerModel::onTrackAdded(const TrackId trackId)
 {
+    if (trackId == metronomeTrackId()) {
+        loadMetronome();
+        return;
+    }
+
     if (indexOfTrack(trackId) != INVALID_MIXER_INDEX) {
         return;
     }
