@@ -29,6 +29,8 @@ qt_add_qml_module(appshell_qml
         aboutmodel.h
         audiosettingsmodel.cpp
         audiosettingsmodel.h
+        chordscrubber.cpp
+        chordscrubber.h
         fadergroups.cpp
         fadergroups.h
         mainwindowtitleprovider.cpp
