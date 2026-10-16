@@ -27,7 +27,7 @@ import Muse.UiComponents
 FlatButton {
     id: root
 
-    //! "hand", "point", "rect", "expand", "collapse" or "" (then iconCode is used)
+    //! "hand", "point", "rect", "tuningfork", "chordscrub", "expand", "collapse" or "" (then iconCode is used)
     property string kind: ""
     property bool selected: false
     property int iconSize: 22
@@ -91,6 +91,42 @@ FlatButton {
                         ctx.moveTo(a[0] + a[2] * 5, a[1]); ctx.lineTo(a[0], a[1]); ctx.lineTo(a[0], a[1] + a[3] * 5)
                         ctx.stroke()
                     }
+                } else if (root.kind === "tuningfork") {
+                    //! A tuning fork: two prongs joined by a U, a stem below it and a little ball at its end
+                    ctx.lineWidth = 2.4
+                    ctx.beginPath()
+                    ctx.moveTo(8, 2.5)
+                    ctx.lineTo(8, 11)
+                    ctx.arc(12, 11, 4, Math.PI, 0, true)
+                    ctx.lineTo(16, 2.5)
+                    ctx.stroke()
+                    ctx.lineWidth = 2.8
+                    ctx.beginPath()
+                    ctx.moveTo(12, 15)
+                    ctx.lineTo(12, 20)
+                    ctx.stroke()
+                    ctx.beginPath()
+                    ctx.arc(12, 21, 1.8, 0, 2 * Math.PI)
+                    ctx.fill()
+                } else if (root.kind === "chordscrub") {
+                    //! A chord (three note heads on a stem) above a double arrow: scrubbing through the score
+                    for (const y of [5.5, 9.5, 13.5]) {
+                        ctx.save()
+                        ctx.translate(10.5, y)
+                        ctx.rotate(-0.35)
+                        ctx.beginPath()
+                        ctx.ellipse(-3.4, -2.2, 6.8, 4.4)
+                        ctx.fill()
+                        ctx.restore()
+                    }
+                    ctx.lineWidth = 1.8
+                    ctx.beginPath(); ctx.moveTo(13.6, 12.5); ctx.lineTo(13.6, 1.8); ctx.stroke()
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    ctx.moveTo(3, 20); ctx.lineTo(21, 20)
+                    ctx.moveTo(6.5, 16.8); ctx.lineTo(3, 20); ctx.lineTo(6.5, 23.2)
+                    ctx.moveTo(17.5, 16.8); ctx.lineTo(21, 20); ctx.lineTo(17.5, 23.2)
+                    ctx.stroke()
                 } else if (root.kind === "hand") {
                     //! A grabbing hand: the palm with four fingers and the thumb
                     ctx.beginPath(); ctx.roundedRect(6.5, 11, 12, 9, 4, 4); ctx.fill()

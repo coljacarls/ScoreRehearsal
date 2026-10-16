@@ -25,6 +25,7 @@
 
 #include <QObject>
 #include <QPointF>
+#include <QVariantList>
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
@@ -35,12 +36,17 @@
 #include "engraving/types/types.h"
 
 namespace mu::appshell {
-//! Audible scrubbing through the score: while the finger is held on the score (see NotationView.reportScrubs),
-//! the playhead follows it and everything that sounds at the playhead position (all tracks) is played as a chord.
+//! Audible scrubbing through the score (chord scrubbing tool): while the finger is held on the score
+//! (see NotationView.reportScrubs) everything that sounds at the position of the finger (all tracks) is played as a
+//! chord, and the chord follows the finger. The playhead does not move.
+//! `noteRects` are the areas of all sounding notes that are shown (logical score coordinates of the shown score) for
+//! the views to point at them; it is empty while nothing sounds.
 //! The session mix (mute, solo, faders) applies, because the notes go through the tracks of the playback.
 class ChordScrubber : public QObject, public muse::Contextable, public muse::async::Asyncable
 {
     Q_OBJECT
+
+    Q_PROPERTY(QVariantList noteRects READ noteRects NOTIFY noteRectsChanged)
 
     QML_ELEMENT
 
@@ -51,17 +57,24 @@ public:
     explicit ChordScrubber(QObject* parent = nullptr);
     ~ChordScrubber() override;
 
+    QVariantList noteRects() const;
+
     //! Positions in logical coordinates of the score view
     Q_INVOKABLE void begin(const QPointF& logicPos);
     Q_INVOKABLE void move(const QPointF& logicPos);
     Q_INVOKABLE void end();
 
+signals:
+    void noteRectsChanged();
+
 private:
+    void setNoteRects(const QVariantList& rects);
     void playAt(const QPointF& logicPos);
     void stopSound();
 
     bool m_active = false;
     int m_lastTick = -1;
+    QVariantList m_noteRects;
     engraving::InstrumentTrackIdSet m_soundingTracks;
 };
 }

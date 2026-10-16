@@ -369,6 +369,8 @@ Item {
             viewModeOverride: root.pageModel.viewModeOverride
 
             laserActive: root.pageModel.isLaserPointerActive
+            pitchPipeActive: root.pageModel.isPitchPipeActive
+            chordScrubActive: root.pageModel.isChordScrubActive
             laserMode: root.pageModel.laserMode
             strokes: root.pageModel.strokes
             liveStroke: prv.laserLiveStroke
@@ -474,6 +476,21 @@ Item {
             }
         }
 
+        //! Floating tools to give pitches in the bottom right corner of the score
+        PitchToolsPanel {
+            id: pitchToolsPanel
+
+            anchors.bottom: notationView.bottom
+            anchors.right: notationView.right
+            anchors.margins: 16
+
+            pageModel: root.pageModel
+            visible: root.pageModel.hasProject
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 3
+        }
+
         //! Floating control bar of the immersive mode
         Rectangle {
             id: floatingBar
@@ -529,6 +546,7 @@ Item {
             liveStroke: prv.laserLiveStroke
             hasHighlight: root.pageModel.hasHighlight
             highlight: root.pageModel.highlight
+            pitchRects: notationView.soundingRects
 
             onCloseRequested: function(geometry) {
                 prv.presentationGeometry = geometry

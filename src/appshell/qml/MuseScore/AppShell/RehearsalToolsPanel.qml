@@ -77,7 +77,7 @@ Rectangle {
 
             kind: "hand"
             gold: false
-            selected: !root.laserActive
+            selected: !root.laserActive && !root.pageModel.isPitchPipeActive && !root.pageModel.isChordScrubActive
 
             toolTipTitle: qsTrc("appshell", "Hand")
             toolTipDescription: qsTrc("appshell", "Move the score, tap to place the playhead")
@@ -87,6 +87,8 @@ Rectangle {
 
             onClicked: {
                 root.pageModel.isLaserPointerActive = false
+                root.pageModel.isPitchPipeActive = false
+                root.pageModel.isChordScrubActive = false
             }
         }
 

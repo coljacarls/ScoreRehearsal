@@ -44,6 +44,10 @@ Window {
     property bool hasHighlight: false
     property rect highlight: Qt.rect(0, 0, 0, 0)
 
+    //! The notes that sound with the pitch pipe or the chord scrubbing (areas in logical score coordinates),
+    //! pointed at by a hand each
+    property var pitchRects: []
+
     onHighlightChanged: scoreView.setHighlight(root.highlight)
     signal closeRequested(rect geometry)
 
@@ -148,6 +152,13 @@ Window {
         paintView: scoreView
         strokes: root.strokes
         liveStroke: root.liveStroke
+    }
+
+    PitchPipeHand {
+        anchors.fill: parent
+
+        paintView: scoreView
+        logicRects: root.pitchRects
     }
 
     PresentationSettingsModel {
