@@ -35,6 +35,16 @@ Window {
 
     //! Parts that are solo in the rehearsal view: the rest of the score is shaded
     property var soloPartIds: []
+
+    //! The strokes drawn with the pen of the laser pointer (lists of points in logical score coordinates)
+    property var strokes: []
+    property var liveStroke: []
+
+    //! The highlighted rectangle of the laser pointer (logical score coordinates)
+    property bool hasHighlight: false
+    property rect highlight: Qt.rect(0, 0, 0, 0)
+
+    onHighlightChanged: scoreView.setHighlight(root.highlight)
     signal closeRequested(rect geometry)
 
     title: qsTrc("appshell", "Presentation")
@@ -48,6 +58,7 @@ Window {
     minimumHeight: 120
 
     visible: true
+
 
     function toggleFullScreen() {
         root.visibility = (root.visibility === Window.FullScreen) ? Window.Windowed : Window.FullScreen
@@ -82,6 +93,7 @@ Window {
 
         Component.onCompleted: {
             scoreView.load()
+            scoreView.setHighlight(root.highlight)
         }
     }
 
@@ -119,10 +131,33 @@ Window {
         }
     }
 
+    LaserHighlight {
+        id: laser
+
+        anchors.fill: parent
+
+        area: scoreView.highlightRect
+        shown: root.hasHighlight
+        shadeColor: prv.shadeColor
+    }
+
+    //! The strokes: on top of the shade and the frame
+    LaserDrawing {
+        anchors.fill: parent
+
+        paintView: scoreView
+        strokes: root.strokes
+        liveStroke: root.liveStroke
+    }
+
+    PresentationSettingsModel {
+        id: settings
+    }
+
     QtObject {
         id: prv
 
-        readonly property color shadeColor: Qt.rgba(0, 0, 0, 0.72)
+        readonly property color shadeColor: Qt.rgba(0, 0, 0, settings.shadePercent / 100)
     }
 
     MouseArea {

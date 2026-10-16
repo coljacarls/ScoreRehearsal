@@ -136,6 +136,26 @@ PresentationPaintView::PresentationPaintView(QQuickItem* parent)
 
 PresentationPaintView::~PresentationPaintView() = default;
 
+QRectF PresentationPaintView::highlightRect() const
+{
+    return m_highlightRect;
+}
+
+void PresentationPaintView::setHighlight(const QRectF& logicRect)
+{
+    m_highlightLogicRect = logicRect;
+    updateHighlight();
+}
+
+void PresentationPaintView::updateHighlight()
+{
+    const QRectF rect = m_highlightLogicRect.isNull() ? QRectF() : fromLogical(RectF::fromQRectF(m_highlightLogicRect)).toQRectF();
+    if (rect != m_highlightRect) {
+        m_highlightRect = rect;
+        emit highlightRectChanged();
+    }
+}
+
 QRectF PresentationPaintView::playheadRect() const
 {
     return m_playheadRect;
@@ -585,6 +605,7 @@ void PresentationPaintView::onMatrixChanged(const muse::draw::Transform& oldMatr
                                             bool overrideZoomType)
 {
     AbstractNotationPaintView::onMatrixChanged(oldMatrix, newMatrix, overrideZoomType);
+    updateHighlight();
     updatePanelIfNeeded();
 }
 

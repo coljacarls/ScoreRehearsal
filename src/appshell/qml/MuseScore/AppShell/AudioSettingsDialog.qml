@@ -276,6 +276,59 @@ FocusScope {
                 text: qsTrc("appshell", "A score with fewer staves is not enlarged beyond this size; the rest stays blank.")
             }
 
+            StyledTextLabel {
+                width: parent.width
+                horizontalAlignment: Text.AlignLeft
+                text: qsTrc("appshell", "Shade over what is not highlighted (%)")
+            }
+
+            Row {
+                width: parent.width
+                spacing: prv.spacing
+
+                IncrementalPropertyControl {
+                    width: 140
+                    height: prv.touchSize
+
+                    currentValue: presentationModel.shadePercent
+                    minValue: presentationModel.minShadePercent
+                    maxValue: presentationModel.maxShadePercent
+                    step: 5
+                    decimals: 0
+                    measureUnitsSymbol: "%"
+
+                    navigation.name: "ShadeControl"
+                    navigation.panel: navPanel
+                    navigation.order: 6
+
+                    onValueEdited: function(newValue) {
+                        presentationModel.shadePercent = newValue
+                    }
+                }
+
+                FlatButton {
+                    height: prv.touchSize
+
+                    text: qsTrc("appshell", "Reset")
+
+                    navigation.name: "ShadeReset"
+                    navigation.panel: navPanel
+                    navigation.order: 7
+
+                    onClicked: {
+                        presentationModel.resetShade()
+                    }
+                }
+            }
+
+            StyledTextLabel {
+                width: parent.width
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                text: qsTrc("appshell", "Darkens the unlit staves of the solo parts and everything around the laser pointer frame.")
+            }
+
             FlatButton {
                 anchors.right: parent.right
 

@@ -69,6 +69,7 @@ class PresentationPaintView : public notation::AbstractNotationPaintView
 
     Q_PROPERTY(QRectF playheadRect READ playheadRect NOTIFY playheadRectChanged)
     Q_PROPERTY(QColor playheadColor READ playheadColor CONSTANT)
+    Q_PROPERTY(QRectF highlightRect READ highlightRect NOTIFY highlightRectChanged)
     Q_PROPERTY(QStringList soloPartIds READ soloPartIds WRITE setSoloPartIds NOTIFY soloPartIdsChanged)
     Q_PROPERTY(QVariantList shadeBands READ shadeBands NOTIFY shadeBandsChanged)
 
@@ -86,6 +87,11 @@ public:
     QRectF playheadRect() const;
     QColor playheadColor() const;
 
+    //! The area of the score that is highlighted (laser pointer), in view coordinates; it moves with the score
+    QRectF highlightRect() const;
+    //! Sets the area to highlight (logical score coordinates)
+    Q_INVOKABLE void setHighlight(const QRectF& logicRect);
+
     //! Parts to keep lit (the solo parts of the rehearsal view); everything else is shaded. Empty: no shade.
     QStringList soloPartIds() const;
     void setSoloPartIds(const QStringList& ids);
@@ -96,6 +102,7 @@ public:
 
 signals:
     void playheadRectChanged();
+    void highlightRectChanged();
     void soloPartIdsChanged();
     void shadeBandsChanged();
 
@@ -118,6 +125,7 @@ private:
     //! Scales the score to the window height and puts the cursor at its fixed place
     void alignToCursor(const muse::RectF& cursorRect);
     void updatePlayhead(const muse::RectF& cursorRect);
+    void updateHighlight();
 
     //! The vertical position of the staves does not change while playing: the stripes only
     //! need to be calculated again when the scaling, the score or the solo parts change
@@ -177,6 +185,8 @@ private:
     const void* m_countedSystem = nullptr;
     bool m_staffCountDirty = true;
     QRectF m_playheadRect;
+    QRectF m_highlightLogicRect;
+    QRectF m_highlightRect;
 
     //! Vertical extent of the system (in logical units), known after the first cursor position
     qreal m_systemCenterY = 0.0;

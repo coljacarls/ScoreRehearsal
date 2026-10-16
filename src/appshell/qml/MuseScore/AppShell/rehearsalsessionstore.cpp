@@ -270,6 +270,7 @@ void RehearsalSessionStore::load()
         session.partName = o.value("partName").toString();
         session.playheadMeasureIndex = std::max(0, o.value("playheadMeasureIndex").toInt());
         session.mixer = o.value("mixer").toObject();
+        session.annotations = o.value("annotations").toObject();
 
         m_sessions.append(session);
     }
@@ -295,6 +296,7 @@ void RehearsalSessionStore::save()
         o["partName"] = session.partName;
         o["playheadMeasureIndex"] = session.playheadMeasureIndex;
         o["mixer"] = session.mixer;
+        o["annotations"] = session.annotations;
         array.append(o);
     }
 

@@ -32,6 +32,9 @@ class PresentationSettingsModel : public QObject, public muse::async::Asyncable
 
     Q_PROPERTY(double maxStaffHeightPercent READ maxStaffHeightPercent WRITE setMaxStaffHeightPercent
                NOTIFY maxStaffHeightPercentChanged)
+    Q_PROPERTY(double shadePercent READ shadePercent WRITE setShadePercent NOTIFY shadePercentChanged)
+    Q_PROPERTY(double minShadePercent READ minShadePercent CONSTANT)
+    Q_PROPERTY(double maxShadePercent READ maxShadePercent CONSTANT)
     Q_PROPERTY(double minPercent READ minPercent CONSTANT)
     Q_PROPERTY(double maxPercent READ maxPercent CONSTANT)
 
@@ -48,7 +51,14 @@ public:
 
     Q_INVOKABLE void resetMaxStaffHeight();
 
+    double shadePercent() const;
+    void setShadePercent(double percent);
+    double minShadePercent() const;
+    double maxShadePercent() const;
+    Q_INVOKABLE void resetShade();
+
 signals:
     void maxStaffHeightPercentChanged();
+    void shadePercentChanged();
 };
 }

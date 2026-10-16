@@ -28,6 +28,10 @@ using namespace mu::appshell;
 PresentationSettingsModel::PresentationSettingsModel(QObject* parent)
     : QObject(parent)
 {
+    muse::settings()->valueChanged(shadeKey()).onReceive(this, [this](const muse::Val&) {
+        emit shadePercentChanged();
+    });
+
     muse::settings()->valueChanged(maxStaffHeightKey()).onReceive(this, [this](const muse::Val&) {
         emit maxStaffHeightPercentChanged();
     });
@@ -57,4 +61,30 @@ double PresentationSettingsModel::maxPercent() const
 void PresentationSettingsModel::resetMaxStaffHeight()
 {
     setMaxStaffHeightPercent(MAX_STAFF_HEIGHT_PERCENT_DEFAULT);
+}
+
+double PresentationSettingsModel::shadePercent() const
+{
+    return mu::appshell::shadePercent();
+}
+
+void PresentationSettingsModel::setShadePercent(double percent)
+{
+    percent = std::clamp(percent, SHADE_PERCENT_MIN, SHADE_PERCENT_MAX);
+    muse::settings()->setSharedValue(shadeKey(), muse::Val(percent));
+}
+
+double PresentationSettingsModel::minShadePercent() const
+{
+    return SHADE_PERCENT_MIN;
+}
+
+double PresentationSettingsModel::maxShadePercent() const
+{
+    return SHADE_PERCENT_MAX;
+}
+
+void PresentationSettingsModel::resetShade()
+{
+    setShadePercent(SHADE_PERCENT_DEFAULT);
 }

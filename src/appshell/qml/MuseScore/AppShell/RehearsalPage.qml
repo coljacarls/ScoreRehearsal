@@ -69,6 +69,10 @@ Item {
         property bool immersive: false
         property bool fullScreenSetByImmersive: false
 
+        //! Laser pointer pen: the stroke that is being drawn (a list of points in logical coordinates); the finished
+        //! strokes and the highlight are annotations in the model (saved in the session)
+        property var laserLiveStroke: []
+
         //! Where the presentation window was the last time (e.g. on the second screen)
         property rect presentationGeometry: Qt.rect(100, 100, 1280, 360)
     }
@@ -105,6 +109,13 @@ Item {
         order: 2
     }
 
+
+    NavigationSection {
+        id: toolsNavSec
+        name: "RehearsalTools"
+        enabled: root.visible && root.pageModel.hasProject
+        order: 3
+    }
     NavigationSection {
         id: tracksPanelNavSec
         name: "RehearsalTracksPanel"
@@ -346,6 +357,47 @@ Item {
 
             viewModeOverride: root.pageModel.viewModeOverride
 
+            laserActive: root.pageModel.isLaserPointerActive
+            laserMode: root.pageModel.laserMode
+            strokes: root.pageModel.strokes
+            liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
+
+            //! Rectangle: a tap removes the frame if there is one, otherwise it creates a new frame where it hit
+            onLaserTapped: function(logicRect) {
+                if (root.pageModel.hasHighlight) {
+                    root.pageModel.clearHighlight()
+                } else {
+                    root.pageModel.setHighlight(logicRect)
+                }
+            }
+
+            onStrokeProgress: function(points) {
+                prv.laserLiveStroke = points
+            }
+
+            onStrokeFinished: function(points) {
+                root.pageModel.addStroke(points)
+                prv.laserLiveStroke = []
+            }
+
+            onHighlightEdited: function(logicRect) {
+                root.pageModel.setHighlight(logicRect)
+            }
+
+            onHighlightDeleteRequested: {
+                root.pageModel.clearHighlight()
+            }
+
+            onStrokeEdited: function(index, points) {
+                root.pageModel.setStroke(index, points)
+            }
+
+            onStrokeDeleteRequested: function(index) {
+                root.pageModel.removeStroke(index)
+            }
+
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: tracksPanel.visible ? tracksPanel.left : parent.right
@@ -369,6 +421,21 @@ Item {
             onCreateGroupRequested: {
                 faderGroupDialog.open()
             }
+        }
+
+        //! Floating tools over the score: hand, laser pointer and its tools
+        RehearsalToolsPanel {
+            id: toolsPanel
+
+            anchors.top: notationView.top
+            anchors.left: notationView.left
+            anchors.margins: 16
+
+            pageModel: root.pageModel
+            visible: root.pageModel.hasProject
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 1
         }
 
         //! Floating control bar of the immersive mode
@@ -427,6 +494,10 @@ Item {
         sourceComponent: PresentationWindow {
             initialGeometry: prv.presentationGeometry
             soloPartIds: tracksPanel.mixerModel.soloPartIds
+            strokes: root.pageModel.strokes
+            liveStroke: prv.laserLiveStroke
+            hasHighlight: root.pageModel.hasHighlight
+            highlight: root.pageModel.highlight
 
             onCloseRequested: function(geometry) {
                 prv.presentationGeometry = geometry
