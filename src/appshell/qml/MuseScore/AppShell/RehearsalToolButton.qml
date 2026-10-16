@@ -27,7 +27,7 @@ import Muse.UiComponents
 FlatButton {
     id: root
 
-    //! "hand", "point", "rect" or "" (then iconCode is used)
+    //! "hand", "point", "rect", "expand", "collapse" or "" (then iconCode is used)
     property string kind: ""
     property bool selected: false
     property int iconSize: 22
@@ -75,6 +75,22 @@ FlatButton {
                     ctx.lineWidth = 2
                     ctx.setLineDash([3, 2.5])
                     ctx.strokeRect(3, 5, 18, 14)
+                } else if (root.kind === "expand" || root.kind === "collapse") {
+                    //! Expansion symbol: a rectangle with arrows in the top right and bottom left corner,
+                    //! pointing out (expand) or in (collapse)
+                    ctx.lineWidth = 2
+                    ctx.beginPath(); ctx.roundedRect(5, 7, 14, 10, 2, 2); ctx.stroke()
+
+                    const out = root.kind === "expand"
+                    // [tip x, tip y, direction of the head arms (towards the center of the rectangle in x and y)]
+                    const arrows = out ? [[21, 3, -1, 1, 14, 10], [3, 21, 1, -1, 10, 14]]
+                                       : [[15, 9, 1, -1, 21, 3], [9, 15, -1, 1, 3, 21]]
+                    for (const a of arrows) {
+                        ctx.beginPath()
+                        ctx.moveTo(a[4], a[5]); ctx.lineTo(a[0], a[1])
+                        ctx.moveTo(a[0] + a[2] * 5, a[1]); ctx.lineTo(a[0], a[1]); ctx.lineTo(a[0], a[1] + a[3] * 5)
+                        ctx.stroke()
+                    }
                 } else if (root.kind === "hand") {
                     //! A grabbing hand: the palm with four fingers and the thumb
                     ctx.beginPath(); ctx.roundedRect(6.5, 11, 12, 9, 4, 4); ctx.fill()

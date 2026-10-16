@@ -179,7 +179,7 @@ Item {
             StyledTextLabel {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, topBar.width - leftRow.x - (homeButton.visible ? homeButton.width : 0)
-                                - presentationButton.width - partDropdown.width - controls.width - menuButton.width - 96)
+                                - presentationButton.width - viewModeButton.width - partDropdown.width - controls.width - menuButton.width - 96)
                 text: root.pageModel.scoreTitle
                 font: ui.theme.largeBodyBoldFont
                 horizontalAlignment: Text.AlignLeft
@@ -211,6 +211,22 @@ Item {
             }
         }
 
+        //! Select button for the view of the score, in front of the part dropdown
+        ViewModeButton {
+            id: viewModeButton
+
+            anchors.right: partDropdown.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+
+            visible: root.pageModel.hasProject
+
+            pageModel: root.pageModel
+
+            navigationPanel: topBarLeftNavPanel
+            navigationOrder: 3
+        }
+
         //! The full score or one of the parts defined in the score
         StyledDropdown {
             id: partDropdown
@@ -235,7 +251,7 @@ Item {
             currentIndex: root.pageModel.currentPartIndex + 1
 
             navigation.panel: topBarLeftNavPanel
-            navigation.order: 3
+            navigation.order: 4
             navigation.accessible.name: qsTrc("appshell", "Part")
 
             onActivated: function(index, value) {
@@ -253,16 +269,11 @@ Item {
             pageModel: root.pageModel
 
             visible: root.pageModel.hasProject
-            immersive: root.immersive
             sidePadding: 0
 
             navigationSection: topBarNavSec
             navigationOrderStart: 2
             navigationName: "RehearsalToolBarControls"
-
-            onToggleImmersiveRequested: {
-                root.setImmersive(!root.immersive)
-            }
         }
 
         FlatButton {
@@ -411,9 +422,15 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
 
-            width: 340
+            //! Wide: two thirds of the window, for setting the faders precisely
+            width: expanded ? Math.round(root.width * 2 / 3) : 340
 
             visible: root.pageModel.hasProject && root.pageModel.isTracksPanelVisible
+
+            onExpandToggled: {
+                expanded = !expanded
+            }
+            metronomeVisible: root.pageModel.isMetronomeEnabled
 
             navigationSection: tracksPanelNavSec
             navigationOrderStart: 1
@@ -436,6 +453,25 @@ Item {
 
             navigationSection: toolsNavSec
             navigationOrderStart: 1
+        }
+
+        //! Floating full screen button in the top right corner of the score
+        FullScreenButton {
+            id: fullScreenButton
+
+            anchors.top: notationView.top
+            anchors.right: notationView.right
+            anchors.margins: 16
+
+            visible: root.pageModel.hasProject
+            immersive: root.immersive
+
+            navigationSection: toolsNavSec
+            navigationOrderStart: 2
+
+            onToggleImmersiveRequested: {
+                root.setImmersive(!root.immersive)
+            }
         }
 
         //! Floating control bar of the immersive mode
@@ -467,8 +503,7 @@ Item {
                 anchors.centerIn: parent
 
                 pageModel: root.pageModel
-
-                immersive: root.immersive
+                viewModeButtonVisible: true
                 presentationButtonVisible: true
                 buttonSize: 40
                 sidePadding: 12
@@ -476,10 +511,6 @@ Item {
                 navigationSection: immersiveControlsNavSec
                 navigationOrderStart: 1
                 navigationName: "RehearsalImmersiveControls"
-
-                onToggleImmersiveRequested: {
-                    root.setImmersive(!root.immersive)
-                }
             }
         }
     }
