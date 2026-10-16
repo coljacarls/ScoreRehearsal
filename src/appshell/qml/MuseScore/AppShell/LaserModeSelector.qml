@@ -39,7 +39,7 @@ Item {
 
     signal modeSelected(int mode)
 
-    width: root.expanded ? row.implicitWidth : 0
+    width: root.expanded ? pill.width : 0
     height: root.buttonSize
 
     visible: width > 0
@@ -59,74 +59,90 @@ Item {
         }
     }
 
-    Row {
-        id: row
+    //! A pill with a gold outline around the two options: they belong to the laser pointer button next to it
+    Rectangle {
+        id: pill
 
-        spacing: 4
+        width: row.implicitWidth + 2 * 3
+        height: root.buttonSize
 
-        FlatButton {
-            id: rectButton
+        radius: height / 2
+        color: Qt.rgba(root.goldColor.r, root.goldColor.g, root.goldColor.b, 0.12)
+        border.width: 1
+        border.color: root.goldColor
 
-            width: root.buttonSize
-            height: root.buttonSize
+        Row {
+            id: row
 
-            accentButton: root.mode === 0
-            accentColor: root.goldColor
-            transparent: root.mode !== 0
-            iconColor: root.mode === 0 ? "#1E1E1E" : ui.theme.fontPrimaryColor
+            anchors.centerIn: parent
+            spacing: 2
 
-            toolTipTitle: qsTrc("appshell", "Rectangle")
-            toolTipDescription: qsTrc("appshell", "Tapping frames the tapped notes")
-            accessible.checked: root.mode === 0
+            FlatButton {
+                id: rectButton
 
-            navigation.panel: root.navigationPanel
-            navigation.order: root.navigationOrderStart
+                width: root.buttonSize - 8
+                height: root.buttonSize - 8
+                backgroundRadius: height / 2
 
-            contentItem: Component {
-                //! A rectangular selection: dashed rectangle
-                Canvas {
-                    implicitWidth: 22
-                    implicitHeight: 22
+                accentButton: root.mode === 0
+                accentColor: root.goldColor
+                transparent: root.mode !== 0
+                iconColor: root.mode === 0 ? "#1E1E1E" : ui.theme.fontPrimaryColor
 
-                    property color color: rectButton.iconColor
+                toolTipTitle: qsTrc("appshell", "Rectangle")
+                toolTipDescription: qsTrc("appshell", "Tapping frames the tapped notes")
+                accessible.checked: root.mode === 0
 
-                    onColorChanged: requestPaint()
+                navigation.panel: root.navigationPanel
+                navigation.order: root.navigationOrderStart
 
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.reset()
-                        ctx.strokeStyle = color
-                        ctx.lineWidth = 2
-                        ctx.setLineDash([3, 2.5])
-                        ctx.strokeRect(3, 5, width - 6, height - 10)
+                contentItem: Component {
+                    //! A rectangular selection: dashed rectangle
+                    Canvas {
+                        implicitWidth: 22
+                        implicitHeight: 22
+
+                        property color color: rectButton.iconColor
+
+                        onColorChanged: requestPaint()
+
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.strokeStyle = color
+                            ctx.lineWidth = 2
+                            ctx.setLineDash([3, 2.5])
+                            ctx.strokeRect(3, 5, width - 6, height - 10)
+                        }
                     }
+                }
+
+                onClicked: {
+                    root.modeSelected(0)
                 }
             }
 
-            onClicked: {
-                root.modeSelected(0)
-            }
-        }
+            FlatButton {
+                width: root.buttonSize - 8
+                height: root.buttonSize - 8
+                backgroundRadius: height / 2
 
-        FlatButton {
-            width: root.buttonSize
-            height: root.buttonSize
+                icon: IconCode.EDIT
+                accentButton: root.mode === 1
+                accentColor: root.goldColor
+                transparent: root.mode !== 1
+                iconColor: root.mode === 1 ? "#1E1E1E" : ui.theme.fontPrimaryColor
 
-            icon: IconCode.EDIT
-            accentButton: root.mode === 1
-            accentColor: root.goldColor
-            transparent: root.mode !== 1
-            iconColor: root.mode === 1 ? "#1E1E1E" : ui.theme.fontPrimaryColor
+                toolTipTitle: qsTrc("appshell", "Pen")
+                toolTipDescription: qsTrc("appshell", "Draw on the score with finger or mouse")
+                accessible.checked: root.mode === 1
 
-            toolTipTitle: qsTrc("appshell", "Pen")
-            toolTipDescription: qsTrc("appshell", "Draw on the score with finger or mouse")
-            accessible.checked: root.mode === 1
+                navigation.panel: root.navigationPanel
+                navigation.order: root.navigationOrderStart + 1
 
-            navigation.panel: root.navigationPanel
-            navigation.order: root.navigationOrderStart + 1
-
-            onClicked: {
-                root.modeSelected(1)
+                onClicked: {
+                    root.modeSelected(1)
+                }
             }
         }
     }

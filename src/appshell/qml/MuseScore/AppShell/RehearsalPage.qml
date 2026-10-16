@@ -222,6 +222,7 @@ Item {
                 onClicked: {
                     root.pageModel.isLaserPointerActive = !root.pageModel.isLaserPointerActive
                 }
+            }
 
             LaserModeSelector {
                 id: laserModeSelector
@@ -237,7 +238,6 @@ Item {
                 onModeSelected: function(newMode) {
                     root.pageModel.laserMode = newMode
                 }
-            }
             }
         }
 
