@@ -1,6 +1,7 @@
 # Plan: ScoreRehearsal Web (PWA)
 
-Status: plan only, nothing implemented yet.
+Status: implemented, **not yet built or run with Qt for WebAssembly** (the environment it was written in
+could not download Qt/Emscripten). See "Status" at the end.
 
 ## Decisions
 
@@ -111,3 +112,36 @@ tab** running the app in presentation mode (`?mode=presentation`):
 - Single-thread performance with large scores.
 - Memory limits on iPad, especially with two instances.
 - Size of the first download.
+
+## Status
+
+What exists, and how far it was checked:
+
+| Part | Where | Checked |
+|---|---|---|
+| Build switches for WASM | `src/cmake/Configure.cmake`, `App.cmake`, fork hook `MUE_BUILD_APPJS_MODULE` | not built |
+| Page, loader, storage, wake lock, full screen | `src/web/*.js`, `index.html` | tested in Chromium against a fake build |
+| Service worker, offline start, update flow | `src/web/sw.js`, `tools/package.mjs` | tested in Chromium (offline reload, update, sound font cache kept) |
+| Presentation tab sync | `presentation.js` | tested in Chromium (score hand-over, state, close) |
+| C++ (`WebBridge`, session library, remote playback of the paint view) | `src/appshell/qml/MuseScore/AppShell` | **not compiled** |
+| QML (`PresentationView/Page`, publisher in `RehearsalPage.qml`) | same | **not run** |
+| CI / GitHub Pages | `.github/workflows/web.yml` | not run; first run will need adjustments |
+| Phase 0 measurements (size, load time, memory, latency) | | **not done**: needs a real build and the devices |
+
+Differences to the plan above:
+
+- The persistent storage is Emscripten's **IDBFS** (IndexedDB), not OPFS: Qt's WebAssembly build has no
+  WASMFS. The result for the user is the same.
+- The score reaches the presentation tab as bytes through the `BroadcastChannel` (not through the
+  library): no stale copy, no waiting for a write to finish, and `window.open` stays inside the click.
+  A score change closes the presentation tab (it shows the score it was opened for).
+- The manifest says `"orientation": "any"` (a music stand holds a tablet in portrait, too).
+- `MS Basic.sf3` is about 51 MB. It is downloaded once and has a cache of its own, so app updates do
+  not load it again. Consider a smaller sound font before the first public release.
+- Sessions are stored by the content hash of the score (library path), so renaming a file keeps the session
+  and two different files with the same name do not share one.
+
+Open points: the first real build (Qt/Emscripten flags, `FS`/`IDBFS` export via `pre.js`, embind
+bindings, memory), measuring Phase 0 on iPad/Android/Surface, whether `QSettings` reaches
+`/files/data` (the page writes the folder back every 20 s as a safety net), and the session
+import/export in the menu.

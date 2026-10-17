@@ -136,3 +136,16 @@ jobs:
           body: ${{ github.event.pull_request.body }}
           generate_release_notes: true
           files: ${{ env.ZIP }}
+
+  # The web version is published for every release; it does not hold back the Windows release
+  web:
+    needs: version
+    if: needs.version.outputs.version != ''
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/web.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      ref: ${{ github.event.pull_request.merge_commit_sha }}

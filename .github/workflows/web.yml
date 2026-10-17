@@ -1,0 +1,149 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# The web version (PWA, Qt for WebAssembly):
+#   - test:   tests of the page, the service worker and the presentation tab in a browser (fake build, quick)
+#   - build:  compiles the app and the audio engine and packages them (src/web/tools/package.mjs)
+#   - deploy: publishes the package on GitHub Pages
+#
+# build and deploy run when started by hand (Actions > Web > Run workflow) and for every release
+# (called by release.yml). GitHub Pages must be set to the source "GitHub Actions" in the settings of the repository.
+#
+# NOTE: the compile steps could not be tried yet (Qt for WebAssembly was not available where this was written).
+# Expect to adjust the Qt/Emscripten setup on the first run.
+
+name: Web
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Version of the release (without v)
+        type: string
+        required: false
+      ref:
+        description: Commit to build
+        type: string
+        required: false
+  pull_request:
+    paths:
+      - 'src/web/**'
+      - '.github/workflows/web.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  QT_VERSION: 6.11.2
+  # The version of Emscripten that Qt requires (https://doc.qt.io/qt-6/wasm.html)
+  EMSDK_VERSION: 4.0.7
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      # The tests use the loader of Qt from MuseScore's web build
+      - name: Get the loader
+        run: git submodule update --init --depth 1 musescore
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        working-directory: src/web
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Test
+        working-directory: src/web
+        run: npm test
+
+  build:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      SCOREREHEARSAL_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Qt for WebAssembly is cross compiled: the tools (moc, rcc, ...) come from Qt of the build machine
+      - name: Install Qt (build machine)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: qt5compat qtshadertools qtwebsockets
+          dir: ${{ runner.temp }}/qt-host
+          cache: true
+
+      - name: Remember Qt of the build machine
+        run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Install Qt (WebAssembly)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: wasm
+          arch: wasm_singlethread
+          modules: qt5compat qtshadertools qtwebsockets
+          dir: ${{ runner.temp }}/qt-wasm
+          cache: true
+
+      - name: Remember Qt for WebAssembly
+        run: echo "QT_WASM_DIR=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build ccache
+
+      - name: Build
+        run: ./build-web.sh build
+
+      - name: Package
+        run: ./build-web.sh package
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
