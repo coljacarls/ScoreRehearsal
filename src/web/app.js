@@ -214,7 +214,7 @@ async function main() {
     await download(build.wasm, "Loading the app…");
     await loadScript(build.script);
 
-    const entry = window[build.entry];
+    const entry = window[build.entry] || window.ScoreRehearsal_entry || window.MuseScoreStudio_entry;
     if (typeof entry !== "function") {
         throw new Error(`${build.script} does not define ${build.entry}`);
     }

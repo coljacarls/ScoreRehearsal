@@ -63,6 +63,14 @@ describe("packaging", () => {
         assert.ok(!sw.includes('"url": "sw.js"'));
     });
 
+    test("the entry function is found by its name in the app script", () => {
+        const fake = makeFakeBuild("entry");
+        fs.writeFileSync(path.join(fake.build, "ScoreRehearsal.js"), "var MuseScoreStudio_entry = (() => { return async () => {}; })();\n");
+        const out = fs.mkdtempSync(path.join(os.tmpdir(), "scorerehearsal-entry-"));
+        packageWebApp({ build: fake.build, audio: fake.audio, sound: fake.sound, out, version: "1.0.0" });
+        assert.equal(JSON.parse(fs.readFileSync(path.join(out, "build-info.json"), "utf8")).entry, "MuseScoreStudio_entry");
+    });
+
     test("the manifest points to existing icons", () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(dist, "manifest.webmanifest"), "utf8"));
         assert.equal(manifest.display, "fullscreen");

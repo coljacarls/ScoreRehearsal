@@ -68,6 +68,14 @@ function versionOf(args) {
     }
 }
 
+// The name of the function that starts the module is made by Emscripten from the target name of CMake
+// (MuseScoreStudio_entry), which is not the name of the file (ScoreRehearsal.js)
+function entryNameOf(file, fallback) {
+    const head = fs.readFileSync(file, "utf8").slice(0, 400000);
+    const match = head.match(/\b(?:var|let|const)\s+([A-Za-z0-9_]+_entry)\b/) || head.match(/\b([A-Za-z0-9_]+_entry)\s*=/);
+    return match ? match[1] : fallback;
+}
+
 export function packageWebApp(args) {
     const { build, audio, out } = args;
     if (!build || !audio || !out) {
@@ -112,7 +120,7 @@ export function packageWebApp(args) {
         version,
         script: base + ".js",
         wasm: base + ".wasm",
-        entry: base + "_entry",
+        entry: entryNameOf(path.join(build, base + ".js"), base + "_entry"),
     }, null, 2) + "\n");
 
     // GitHub Pages: no Jekyll processing
