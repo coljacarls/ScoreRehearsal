@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick
 import QtQuick.Window
 
@@ -24,9 +23,7 @@ import Muse.Ui
 import Muse.UiComponents
 import MuseScore.AppShell
 
-//! Detached window for the audience: only the score and the playhead.
-//! The playhead stays near the left edge and the score scrolls underneath it (karaoke style).
-//! It follows the playback position only, not the zoom and position of the rehearsal view.
+//! Detached window for the audience: only the score and the playhead (see PresentationView).
 Window {
     id: root
 
@@ -34,21 +31,20 @@ Window {
     property rect initialGeometry: Qt.rect(0, 0, 1280, 360)
 
     //! Parts that are solo in the rehearsal view: the rest of the score is shaded
-    property var soloPartIds: []
+    property alias soloPartIds: view.soloPartIds
 
     //! The strokes drawn with the pen of the laser pointer (lists of points in logical score coordinates)
-    property var strokes: []
-    property var liveStroke: []
+    property alias strokes: view.strokes
+    property alias liveStroke: view.liveStroke
 
     //! The highlighted rectangle of the laser pointer (logical score coordinates)
-    property bool hasHighlight: false
-    property rect highlight: Qt.rect(0, 0, 0, 0)
+    property alias hasHighlight: view.hasHighlight
+    property alias highlight: view.highlight
 
     //! The notes that sound with the pitch pipe or the chord scrubbing (areas in logical score coordinates),
     //! pointed at by a hand each
-    property var pitchRects: []
+    property alias pitchRects: view.pitchRects
 
-    onHighlightChanged: scoreView.setHighlight(root.highlight)
     signal closeRequested(rect geometry)
 
     title: qsTrc("appshell", "Presentation")
@@ -63,7 +59,6 @@ Window {
 
     visible: true
 
-
     function toggleFullScreen() {
         root.visibility = (root.visibility === Window.FullScreen) ? Window.Windowed : Window.FullScreen
     }
@@ -74,105 +69,11 @@ Window {
                                                                   : Qt.rect(root.x, root.y, root.width, root.height))
     }
 
-    PresentationPaintView {
-        id: scoreView
+    PresentationView {
+        id: view
 
         anchors.fill: parent
 
-        //! Read-only: nothing here reacts to mouse or touch
-        enabled: false
-
-        //! The playhead is drawn by the view itself at a fixed place (not by the base class cursor)
-        Rectangle {
-            x: scoreView.playheadRect.x
-            y: scoreView.playheadRect.y
-            width: scoreView.playheadRect.width
-            height: scoreView.playheadRect.height
-
-            visible: scoreView.playheadRect.width > 0
-            color: scoreView.playheadColor
-        }
-
-        soloPartIds: root.soloPartIds
-
-        Component.onCompleted: {
-            scoreView.load()
-            scoreView.setHighlight(root.highlight)
-        }
-    }
-
-    //! Fixed above the score: only the score underneath moves while playing.
-    //! Dark stripes over everything but the solo staves, with a soft gradient (not a hard edge) to them.
-    Repeater {
-        model: scoreView.shadeBands
-
-        Rectangle {
-            required property var modelData
-
-            x: 0
-            y: modelData.y
-            width: root.width
-            height: modelData.height
-
-            gradient: Gradient {
-                GradientStop {
-                    position: 0.0
-                    color: modelData.fadeTop > 0 ? "transparent" : prv.shadeColor
-                }
-                GradientStop {
-                    position: modelData.fadeTop / modelData.height
-                    color: prv.shadeColor
-                }
-                GradientStop {
-                    position: 1.0 - modelData.fadeBottom / modelData.height
-                    color: prv.shadeColor
-                }
-                GradientStop {
-                    position: 1.0
-                    color: modelData.fadeBottom > 0 ? "transparent" : prv.shadeColor
-                }
-            }
-        }
-    }
-
-    LaserHighlight {
-        id: laser
-
-        anchors.fill: parent
-
-        area: scoreView.highlightRect
-        shown: root.hasHighlight
-        shadeColor: prv.shadeColor
-    }
-
-    //! The strokes: on top of the shade and the frame
-    LaserDrawing {
-        anchors.fill: parent
-
-        paintView: scoreView
-        strokes: root.strokes
-        liveStroke: root.liveStroke
-    }
-
-    PitchPipeHand {
-        anchors.fill: parent
-
-        paintView: scoreView
-        logicRects: root.pitchRects
-    }
-
-    PresentationSettingsModel {
-        id: settings
-    }
-
-    QtObject {
-        id: prv
-
-        readonly property color shadeColor: Qt.rgba(0, 0, 0, settings.shadePercent / 100)
-    }
-
-    MouseArea {
-        anchors.fill: parent
         onDoubleClicked: root.toggleFullScreen()
     }
 

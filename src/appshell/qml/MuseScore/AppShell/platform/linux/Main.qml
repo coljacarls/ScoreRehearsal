@@ -38,7 +38,30 @@ AppWindow {
         }
     }
 
-    RehearsalPage {
+    //! The browser version opens a second tab for the audience: it shows the presentation page instead
+    WebBridge {
+        id: web
+    }
+
+    Loader {
         anchors.fill: parent
+
+        sourceComponent: web.isPresentationInstance ? presentationPage : rehearsalPage
+    }
+
+    Component {
+        id: rehearsalPage
+
+        RehearsalPage {
+            anchors.fill: parent
+        }
+    }
+
+    Component {
+        id: presentationPage
+
+        PresentationPage {
+            anchors.fill: parent
+        }
     }
 }

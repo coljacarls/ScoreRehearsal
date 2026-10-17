@@ -30,6 +30,8 @@
 #include <QStandardPaths>
 #include <QUuid>
 
+#include "webbridge.h"
+
 #include "log.h"
 
 using namespace mu::appshell;
@@ -67,7 +69,8 @@ QString RehearsalSessionStore::normalizedPath(const QString& filePath)
         return QString();
     }
 
-    return QDir::cleanPath(QFileInfo(filePath).absoluteFilePath());
+    //! In the browser a score that was just picked lives in memory only: its session belongs to its copy in the library
+    return QDir::cleanPath(QFileInfo(web::libraryPath(filePath)).absoluteFilePath());
 }
 
 void RehearsalSessionStore::setStoragePath(const QString& path)
@@ -84,7 +87,12 @@ QString RehearsalSessionStore::storagePath() const
         return m_storagePath;
     }
 
+#ifdef Q_OS_WASM
+    //! The persistent folder of the page (see src/web/storage.js)
+    const QString dir = QStringLiteral("/files/data");
+#else
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+#endif
     return QDir(dir).filePath(QStringLiteral("sessions.json"));
 }
 
@@ -316,5 +324,8 @@ void RehearsalSessionStore::save()
     file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     if (!file.commit()) {
         LOGE() << "unable to write the sessions to " << path;
+        return;
     }
+
+    web::persistStorage();
 }

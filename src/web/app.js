@@ -219,11 +219,14 @@ async function main() {
         throw new Error(`${build.script} does not define ${build.entry}`);
     }
 
+    // The app opens this file like a file from the command line
+    const startupPath = startupScore ? "/interactive/" + safeFileName(startupScore.name) : null;
+
     const Module = {
         config, // static configuration of the audio, read by the C++ side
         webMode: presentation ? "presentation" : "rehearsal",
         soundFont: new URL("sound/MS%20Basic.sf3", document.baseURI).href,
-        arguments: [],
+        arguments: startupPath ? [startupPath] : [],
         print: (text) => console.log(text),
         printErr: (text) => console.warn(text),
 
@@ -242,7 +245,7 @@ async function main() {
         },
     };
 
-    const storage = createStorage(Module);
+    const storage = createStorage(Module, { readOnly: presentation });
     const wakeLock = createWakeLock();
 
     // Called from C++ (AppJsModule::onStartApp) when the app is initialised
@@ -271,10 +274,9 @@ async function main() {
         (instance) => {
             mountStorage(instance);
             if (startupScore) {
-                const name = safeFileName(startupScore.name);
                 instance.FS.mkdirTree("/interactive");
-                instance.FS.writeFile("/interactive/" + name, startupScore.bytes);
-                instance.startupScore = { path: "/interactive/" + name, title: name.replace(/\.[^.]*$/, "") };
+                instance.FS.writeFile(startupPath, startupScore.bytes);
+                instance.startupScore = { path: startupPath, title: startupPath.split("/").pop().replace(/\.[^.]*$/, "") };
             }
         },
     ];
@@ -291,6 +293,11 @@ async function main() {
     if (presentation) {
         // No sound, no start button: only keep the screen on
         document.addEventListener("pointerdown", () => wakeLock.set(true), { once: true });
+    }
+
+    if (!presentation) {
+        // QSettings and other files are written by the app without telling the page
+        setInterval(() => storage.persist(), 20000);
     }
 
     await qtLoad(Module);

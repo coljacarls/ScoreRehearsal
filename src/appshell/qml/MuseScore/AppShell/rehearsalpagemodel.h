@@ -78,6 +78,10 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(bool isMetronomeEnabled READ isMetronomeEnabled NOTIFY isMetronomeEnabledChanged)
     Q_PROPERTY(int measureNumber READ measureNumber NOTIFY playPositionChanged)
     Q_PROPERTY(int beatNumber READ beatNumber NOTIFY playPositionChanged)
+    //! The position of the playback in seconds (the presentation tab of the browser version follows it)
+    Q_PROPERTY(double playbackSecs READ playbackSecs NOTIFY playPositionChanged)
+    //! The file of the score that is open (empty without a score)
+    Q_PROPERTY(QString scorePath READ scorePath NOTIFY scoreTitleChanged)
 
     QML_ELEMENT
 
@@ -106,6 +110,8 @@ public:
     //! not to a single view): while it is open, the rehearsal view stays in the continuous view
     bool isPresentationWindowOpen() const;
     void setIsPresentationWindowOpen(bool open);
+    //! The browser version: the user closed the tab of the presentation
+    Q_INVOKABLE void presentationTabClosed();
 
     //! Laser pointer tool (instead of the hand): the score is not dragged, taps do not seek.
     bool isLaserPointerActive() const;
@@ -151,6 +157,9 @@ public:
     //! Index in partNames(), -1: the full score
     int currentPartIndex() const;
     Q_INVOKABLE void selectPart(int index);
+
+    double playbackSecs() const;
+    QString scorePath() const;
 
     QString scoreTitle() const;
     bool isPlaying() const;

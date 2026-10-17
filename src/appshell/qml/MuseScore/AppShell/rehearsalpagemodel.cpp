@@ -46,6 +46,7 @@
 
 #include "appshellcommands.h"
 #include "rehearsalsessionstore.h"
+#include "webbridge.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
@@ -185,6 +186,11 @@ void RehearsalPageModel::load()
     });
 
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
+        //! The tab of the presentation in the browser shows the score it was opened for
+        if (web::isWeb()) {
+            setIsPresentationWindowOpen(false);
+        }
+
         if (auto project = globalContext()->currentProject()) {
             project->displayNameChanged().onNotify(this, [this]() {
                 emit scoreTitleChanged();
@@ -406,7 +412,29 @@ void RehearsalPageModel::setIsPresentationWindowOpen(bool open)
         return;
     }
 
+    //! In the browser the presentation is a tab of its own (it is opened by the click that gets here)
+    if (web::isWeb()) {
+        if (open && !web::openPresentationTab(scorePath())) {
+            return;
+        }
+
+        if (!open) {
+            web::closePresentationTab();
+        }
+    }
+
     presentationWindowOpenFlag() = open;
+
+    sessionChangedNotification().notify();
+}
+
+void RehearsalPageModel::presentationTabClosed()
+{
+    if (!presentationWindowOpenFlag()) {
+        return;
+    }
+
+    presentationWindowOpenFlag() = false;
 
     sessionChangedNotification().notify();
 }
@@ -495,6 +523,17 @@ bool RehearsalPageModel::isMetronomeEnabled() const
 int RehearsalPageModel::measureNumber() const
 {
     return playbackController()->currentBeat().measureIndex + 1;
+}
+
+double RehearsalPageModel::playbackSecs() const
+{
+    return globalContext()->playbackState()->playbackPosition();
+}
+
+QString RehearsalPageModel::scorePath() const
+{
+    const INotationProjectPtr project = globalContext()->currentProject();
+    return project ? project->path().toQString() : QString();
 }
 
 int RehearsalPageModel::beatNumber() const

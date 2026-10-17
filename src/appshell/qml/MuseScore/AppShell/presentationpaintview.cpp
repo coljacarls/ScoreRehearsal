@@ -222,7 +222,7 @@ void PresentationPaintView::onLoadNotation(INotationPtr notation)
     //! Frames are only rendered on request: without this, nothing would start the frame loop of onFrame()
     //! when the player starts (the position that is shown does not change yet, so nothing is redrawn)
     globalContext()->playbackState()->playbackStatusChanged().onReceive(&m_subscriptions, [this](audio::PlaybackStatus) {
-        if (globalContext()->playbackState()->isPlaying()) {
+        if (isPlaying()) {
             requestFrame();
         }
     }, async::Asyncable::Mode::SetReplace);
@@ -253,6 +253,11 @@ void PresentationPaintView::onLoadNotation(INotationPtr notation)
     notationConfig()->scoreInversionChanged().onNotify(&m_subscriptions, rebuild, async::Asyncable::Mode::SetReplace);
     notationConfig()->isOnlyInvertInDarkThemeChanged().onNotify(&m_subscriptions, rebuild, async::Asyncable::Mode::SetReplace);
     uiConfig()->currentThemeChanged().onNotify(&m_subscriptions, rebuild, async::Asyncable::Mode::SetReplace);
+
+    //! The state from the rehearsal tab may have arrived before the score was loaded
+    if (m_remote) {
+        moveCursorToSecs(m_reportedSecs);
+    }
 }
 
 void PresentationPaintView::onUnloadNotation(INotationPtr notation)
@@ -323,6 +328,57 @@ void PresentationPaintView::onPlaybackPositionChanged(secs_t secs)
     m_reportedAtNs = m_clock.nsecsElapsed();
 }
 
+bool PresentationPaintView::isPlaying() const
+{
+    return m_remote ? m_remotePlaying : globalContext()->playbackState()->isPlaying();
+}
+
+void PresentationPaintView::moveCursorToSecs(secs_t secs)
+{
+    const INotationPlaybackPtr playback = notationPlayback();
+    if (!notation() || !m_cursor || !playback) {
+        return;
+    }
+
+    m_cursor->move(playback->secToTick(secs));
+
+    const RectF cursorRect = m_cursor->rect();
+    if (!cursorRect.isNull()) {
+        m_lastCursorRect = cursorRect;
+        alignToCursor(cursorRect);
+    }
+}
+
+void PresentationPaintView::setRemotePlayback(double secs, bool playing)
+{
+    const bool wasPlaying = isPlaying();
+
+    m_remote = true;
+    m_remotePlaying = playing;
+    onPlaybackPositionChanged(secs);
+
+    if (playing) {
+        //! onFrame() moves the score from the reported position
+        if (!wasPlaying) {
+            m_clockRunning = false;
+        }
+
+        requestFrame();
+        return;
+    }
+
+    //! A stopped player or a seek: the score is put at the position at once
+    m_clockRunning = false;
+    m_shownSecs = secs;
+    moveCursorToSecs(secs);
+    requestFrame();
+}
+
+void PresentationPaintView::useContinuousView()
+{
+    setViewModeOverride(static_cast<int>(ViewMode::LINE));
+}
+
 void PresentationPaintView::onFrame()
 {
     const qint64 now = m_clock.nsecsElapsed();
@@ -337,7 +393,7 @@ void PresentationPaintView::onFrame()
         logStats();
     }
 
-    if (!notation() || !m_cursor || !globalContext()->playbackState()->isPlaying()) {
+    if (!notation() || !m_cursor || !isPlaying()) {
         m_clockRunning = false;
         return;
     }
@@ -359,13 +415,7 @@ void PresentationPaintView::onFrame()
         m_shownSecs += (estimated - m_shownSecs) * CLOCK_CORRECTION;
     }
 
-    m_cursor->move(playback->secToTick(m_shownSecs));
-
-    const RectF cursorRect = m_cursor->rect();
-    if (!cursorRect.isNull()) {
-        m_lastCursorRect = cursorRect;
-        alignToCursor(cursorRect);
-    }
+    moveCursorToSecs(m_shownSecs);
 
     //! Keeps the frames coming, also when the canvas could not be moved (e.g. at the end of the score)
     requestFrame();
@@ -399,7 +449,7 @@ bool PresentationPaintView::followPlaybackCursor(const RectF& cursorRect)
 {
     //! While playing, onFrame() moves the score; here only the position of a stopped player is followed
     //! (seeking in the rehearsal view)
-    if (globalContext()->playbackState()->isPlaying()) {
+    if (isPlaying()) {
         return true;
     }
 
@@ -740,7 +790,7 @@ void PresentationPaintView::scheduleRenderStep()
         return;
     }
 
-    const bool playing = globalContext()->playbackState()->isPlaying();
+    const bool playing = isPlaying();
     m_renderTimer.start(playing ? RENDER_STEP_PLAYING_MS : RENDER_STEP_MS);
 }
 

@@ -300,11 +300,17 @@ Item {
                     { id: "fullscreen", title: qsTrc("appshell", "Full screen"), checkable: true, checked: root.pageModel.isFullScreen },
                     { id: "darktheme", title: qsTrc("appshell", "Dark theme"), checkable: true, checked: root.pageModel.isDarkTheme },
                     { },
-                    { id: "settings", title: qsTrc("appshell", "Settings…") },
-                    { id: "about", title: qsTrc("appshell", "About ScoreRehearsal…") },
+                    { id: "settings", title: qsTrc("appshell", "Settings…") }
+                ].concat(web.isWeb ? [
+                    //! The sessions live in the browser: a file is the backup against cleared site data
+                    { id: "exportsessions", title: qsTrc("appshell", "Back up sessions…") },
+                    { id: "importsessions", title: qsTrc("appshell", "Restore sessions…") }
+                ] : []).concat([
+                    { id: "about", title: qsTrc("appshell", "About ScoreRehearsal…") }
+                ]).concat(web.isWeb ? [] : [
                     { },
                     { id: "quit", title: qsTrc("appshell", "Quit") }
-                ])
+                ]))
             }
 
             StyledMenuLoader {
@@ -318,6 +324,8 @@ Item {
                     case "fullscreen": root.pageModel.setFullScreen(!root.pageModel.isFullScreen); break
                     case "darktheme": root.pageModel.setDarkTheme(!root.pageModel.isDarkTheme); break
                     case "settings": audioSettingsDialog.open(); break
+                    case "exportsessions": web.exportSessions(); break
+                    case "importsessions": web.importSessions(); break
                     case "about": root.pageModel.showAbout(); break
                     case "quit": root.pageModel.quit(); break
                     }
@@ -538,7 +546,8 @@ Item {
     Loader {
         id: presentationWindowLoader
 
-        active: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen
+        //! The browser version has a tab of its own for the audience instead (see below)
+        active: root.pageModel.hasProject && root.pageModel.isPresentationWindowOpen && !web.isWeb
 
         sourceComponent: PresentationWindow {
             initialGeometry: prv.presentationGeometry
@@ -554,6 +563,106 @@ Item {
                 root.pageModel.isPresentationWindowOpen = false
             }
         }
+    }
+
+    // ---- The browser version: the presentation is a tab of its own (PresentationPage) ----
+
+    WebBridge {
+        id: web
+
+        onPresentationClosed: root.pageModel.presentationTabClosed()
+    }
+
+    PresentationSettingsModel {
+        id: presentationSettings
+    }
+
+    //! Everything the tab for the audience shows besides the score: sent as JSON to the other tab, which has
+    //! no playback and no rehearsal view of its own
+    function presentationState() {
+        const point = function(p) { return { x: p.x, y: p.y } }
+        const rect = function(r) { return { x: r.x, y: r.y, width: r.width, height: r.height } }
+
+        const partIndex = root.pageModel.currentPartIndex
+        return JSON.stringify({
+            secs: root.pageModel.playbackSecs,
+            playing: root.pageModel.isPlaying,
+            part: partIndex >= 0 ? root.pageModel.partNames[partIndex] : "",
+            solo: tracksPanel.mixerModel.soloPartIds,
+            strokes: root.pageModel.strokes.map(function(stroke) { return stroke.map(point) }),
+            liveStroke: prv.laserLiveStroke.map(point),
+            hasHighlight: root.pageModel.hasHighlight,
+            highlight: rect(root.pageModel.highlight),
+            pitchRects: notationView.soundingRects.map(rect),
+            shade: presentationSettings.shadePercent,
+            maxStaff: presentationSettings.maxStaffHeightPercent
+        })
+    }
+
+    function publishPresentation() {
+        if (web.isWeb && root.pageModel.isPresentationWindowOpen) {
+            web.publishState(root.presentationState())
+        }
+    }
+
+    //! Changes come in bursts (a stroke is many points): one message per few milliseconds is enough
+    Timer {
+        id: publishSoon
+
+        interval: 30
+        onTriggered: root.publishPresentation()
+    }
+
+    //! While playing the position changes all the time: about ten messages per second keep the other tab in step
+    Timer {
+        id: publishWhilePlaying
+
+        interval: 100
+        repeat: true
+        running: web.isWeb && root.pageModel.isPresentationWindowOpen && root.pageModel.isPlaying
+        onTriggered: root.publishPresentation()
+    }
+
+    Connections {
+        target: root.pageModel
+
+        function onIsPresentationWindowOpenChanged() { publishSoon.restart() }
+        function onIsPlayingChanged() { publishSoon.restart() }
+        function onAnnotationsChanged() { publishSoon.restart() }
+        function onCurrentPartChanged() { publishSoon.restart() }
+        function onPartsChanged() { publishSoon.restart() }
+
+        //! A seek of the stopped player (while playing the timer above sends the position)
+        function onPlayPositionChanged() {
+            if (!root.pageModel.isPlaying) {
+                publishSoon.restart()
+            }
+        }
+    }
+
+    Connections {
+        target: tracksPanel.mixerModel
+
+        function onSoloPartIdsChanged() { publishSoon.restart() }
+    }
+
+    Connections {
+        target: prv
+
+        function onLaserLiveStrokeChanged() { publishSoon.restart() }
+    }
+
+    Connections {
+        target: notationView
+
+        function onSoundingRectsChanged() { publishSoon.restart() }
+    }
+
+    Connections {
+        target: presentationSettings
+
+        function onShadePercentChanged() { publishSoon.restart() }
+        function onMaxStaffHeightPercentChanged() { publishSoon.restart() }
     }
 
     NavigationSection {

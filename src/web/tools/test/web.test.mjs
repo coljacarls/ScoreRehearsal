@@ -115,6 +115,35 @@ describe("app", () => {
         await context.close();
     });
 
+    test("restores the sessions from a file", async () => {
+        const context = await browser.newContext();
+        const page = await newPage(context);
+        await page.waitForSelector("#start");
+
+        await page.evaluate(() => {
+            const write = window.__instance.FS.writeFile;
+            window.__instance.FS.writeFile = (path, data) => {
+                sessionStorage.setItem("written:" + path, typeof data === "string" ? data : new TextDecoder().decode(data));
+                write(path, data);
+            };
+            const button = document.createElement("button");
+            button.id = "restore";
+            button.style.cssText = "position:fixed;top:0;left:0;z-index:99";
+            button.textContent = "restore";
+            button.onclick = () => window.__instance.importSessions();
+            document.body.appendChild(button);
+        });
+
+        const chooser = page.waitForEvent("filechooser");
+        await page.click("#restore");
+        await Promise.all([
+            page.waitForEvent("load"), // the app is restarted: it reads the file once
+            (await chooser).setFiles({ name: "sessions.json", mimeType: "application/json", buffer: Buffer.from('{"version":1,"sessions":[]}') }),
+        ]);
+        assert.equal(await page.evaluate(() => sessionStorage.getItem("written:/files/data/sessions.json")), '{"version":1,"sessions":[]}');
+        await context.close();
+    });
+
     test("a cancelled file dialog is reported with an empty name", async () => {
         const context = await browser.newContext();
         const page = await newPage(context);
@@ -238,6 +267,13 @@ describe("presentation tab", () => {
         }));
         assert.deepEqual(startup, { score: { path: "/interactive/Song.mscz", title: "Song" }, bytes: [7, 8, 9], mode: "presentation" });
         assert.equal(await presentation.locator("#start").isHidden(), true, "no sound in the presentation tab");
+        assert.deepEqual(await presentation.evaluate(() => window.__instance.arguments), ["/interactive/Song.mscz"],
+                         "the app opens the score like a file from the command line");
+
+        // the presentation tab has old copies of the files: it never writes them back
+        await presentation.evaluate(() => window.__instance.persistStorage());
+        await presentation.waitForTimeout(1500);
+        assert.ok(!(await presentation.evaluate(() => window.__calls.syncfs)).includes(false));
 
         await rehearsal.evaluate(() => window.__instance.publishPresentationState('{"secs":12.5}'));
         await presentation.waitForFunction(() => window.__states.length > 0);

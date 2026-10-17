@@ -34,7 +34,10 @@ export function mountStorage(Module) {
 
 // Writes the files back to IndexedDB. Calls are merged and run one after the other,
 // as IDBFS does not allow two synchronisations at the same time.
-export function createStorage(Module) {
+//
+// readOnly: the presentation tab. It has a copy of the files from when it was started and must never write
+// them back over the newer ones of the rehearsal tab.
+export function createStorage(Module, { readOnly = false } = {}) {
     let timer = null;
     let running = false;
     let again = false;
@@ -42,7 +45,7 @@ export function createStorage(Module) {
 
     function syncOnce() {
         const FS = Module.FS;
-        if (!FS || !Module.IDBFS) {
+        if (readOnly || !FS || !Module.IDBFS) {
             return Promise.resolve();
         }
         return new Promise((resolve) => {
@@ -75,6 +78,9 @@ export function createStorage(Module) {
     const storage = {
         // Called by the app after it wrote a file (Module.persistStorage)
         persist() {
+            if (readOnly) {
+                return;
+            }
             clearTimeout(timer);
             timer = setTimeout(run, WRITE_BACK_DELAY_MS);
         },
@@ -82,6 +88,9 @@ export function createStorage(Module) {
         // Writes back right now; resolves when everything is stored
         flush() {
             clearTimeout(timer);
+            if (readOnly) {
+                return Promise.resolve();
+            }
             return new Promise((resolve) => {
                 waiters.push(resolve);
                 run();

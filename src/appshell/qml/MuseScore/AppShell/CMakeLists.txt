@@ -51,6 +51,8 @@ qt_add_qml_module(appshell_qml
         rehearsalsessionlistmodel.h
         rehearsalsessionstore.cpp
         rehearsalsessionstore.h
+        webbridge.cpp
+        webbridge.h
         windowstatemodel.cpp
         windowstatemodel.h
     QML_FILES
@@ -68,6 +70,8 @@ qt_add_qml_module(appshell_qml
         ViewModeButton.qml
         FullScreenButton.qml
         OpenScorePlaceholder.qml
+        PresentationPage.qml
+        PresentationView.qml
         PresentationWindow.qml
         RehearsalControls.qml
         RehearsalMixerPanel.qml
@@ -99,7 +103,8 @@ elseif(OS_IS_WIN)
             platform/win/AppTitleBar.qml
             platform/win/Main.qml
     )
-elseif(OS_IS_LIN OR OS_IS_FREEBSD)
+elseif(OS_IS_LIN OR OS_IS_FREEBSD OR OS_IS_WASM)
+    # The browser version uses the Linux main window (the default platform of MuseScore's GuiApplication)
     qt_target_qml_sources(appshell_qml
         QML_FILES
             platform/linux/Main.qml

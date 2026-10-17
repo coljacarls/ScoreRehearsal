@@ -96,6 +96,15 @@ public:
     QStringList soloPartIds() const;
     void setSoloPartIds(const QStringList& ids);
 
+    //! The browser version shows the score in a tab of its own that plays nothing: it is told the position of the
+    //! playback of the rehearsal tab instead (and whether it is playing). Without it the view follows the playback
+    //! of this instance, as in the presentation window of the desktop version.
+    Q_INVOKABLE void setRemotePlayback(double secs, bool playing);
+
+    //! The layout mode of the score is shared by all views of it. In the presentation tab there is no rehearsal
+    //! view that sets the continuous view, so this view does.
+    Q_INVOKABLE void useContinuousView();
+
     //! The shaded stripes of the window height, in view coordinates, top to bottom:
     //! [{ y, height, fadeTop, fadeBottom }]. The fade is the length of the gradient to the lit staves.
     QVariantList shadeBands() const;
@@ -138,6 +147,8 @@ private:
     qreal measureWidth() const;
 
     void onPlaybackPositionChanged(muse::secs_t secs);
+    bool isPlaying() const;
+    void moveCursorToSecs(muse::secs_t secs);
     void requestFrame();
     void logStats();
 
@@ -211,6 +222,10 @@ private:
     QElapsedTimer m_clock;
     qint64 m_reportedAtNs = 0;
     qint64 m_lastFrameNs = 0;
+    //! The position and the state come from the rehearsal tab (setRemotePlayback)
+    bool m_remote = false;
+    bool m_remotePlaying = false;
+
     muse::secs_t m_reportedSecs = 0.0;
     muse::secs_t m_shownSecs = 0.0;
     bool m_clockRunning = false;
