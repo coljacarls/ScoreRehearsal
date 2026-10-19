@@ -67,6 +67,7 @@ qt_add_qml_module(appshell_qml
         RehearsalToolsPanel.qml
         ViewModeButton.qml
         FullScreenButton.qml
+        HorizontalPanSlider.qml
         OpenScorePlaceholder.qml
         PresentationWindow.qml
         RehearsalControls.qml

@@ -66,11 +66,24 @@ static float normalizedAbsoluteDb(float db)
     return std::clamp(std::round(db * 10.f) / 10.f, REHEARSAL_VOLUME_DB_MIN, ABSOLUTE_VOLUME_DB_MAX);
 }
 
+//! Pans are kept in whole percent, so that the slider and the audio agree
+static float normalizedPan(float pan)
+{
+    return std::clamp(std::round(pan * 100.f) / 100.f, BALANCE_MIN.raw(), BALANCE_MAX.raw());
+}
+
 //! The volume of a track as stored in the score
 static float scoreVolumeDb(const INotationProjectPtr& project, const InstrumentTrackId& instrumentTrackId)
 {
     const AudioOutputParams& params = project->audioSettings()->trackOutputParams(instrumentTrackId);
     return normalizedAbsoluteDb(params.control().volume.evaluateAt(muse::secs_t(0.0), VOLUME_DB_MIN, VOLUME_DB_MAX).raw());
+}
+
+//! The pan (balance) of a track as stored in the score, -1 (left)..1 (right)
+static float scorePan(const INotationProjectPtr& project, const InstrumentTrackId& instrumentTrackId)
+{
+    const AudioOutputParams& params = project->audioSettings()->trackOutputParams(instrumentTrackId);
+    return normalizedPan(params.control().balance.evaluateAt(muse::secs_t(0.0), BALANCE_MIN, BALANCE_MAX).raw());
 }
 
 namespace {
@@ -122,6 +135,8 @@ struct RehearsalMixerSession {
     bool shownPartOnly = false; // play only the tracks of the shown part
     //! Track faders of sessions from before the faders were absolute: offsets to the volume in the score
     std::unordered_map<InstrumentTrackId, float> legacyRelativeDb;
+    //! Pan of the tracks that were set once, -1 (left)..1 (right)
+    std::unordered_map<InstrumentTrackId, float> pans;
 };
 
 QString trackKey(const InstrumentTrackId& id)
@@ -149,11 +164,18 @@ QJsonObject mixerToJson(const RehearsalMixerSession& session)
 {
     QJsonObject tracks;
     for (const auto& [id, state] : session.tracks) {
-        tracks[trackKey(id)] = QJsonObject {
+        QJsonObject track {
             { "on", state.isOn },
             { "solo", state.isSolo },
             { "absoluteDb", static_cast<double>(state.volumeDb) }
         };
+
+        auto pan = session.pans.find(id);
+        if (pan != session.pans.end()) {
+            track["pan"] = static_cast<double>(pan->second);
+        }
+
+        tracks[trackKey(id)] = track;
     }
 
     QJsonArray groups;
@@ -223,6 +245,10 @@ void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
             session.legacyRelativeDb[*id] = state.volumeDb;
         }
         session.tracks[*id] = state;
+
+        if (o.contains("pan")) {
+            session.pans[*id] = normalizedPan(static_cast<float>(o.value("pan").toDouble()));
+        }
     }
 
     for (const QJsonValue& value : json.value("groups").toArray()) {
@@ -364,6 +390,10 @@ QVariant RehearsalMixerModel::data(const QModelIndex& index, int role) const
         return track ? effectiveDb(row.trackIndex) : REHEARSAL_VOLUME_DB_MIN;
     case ScoreDbRole:
         return track ? track->scoreDb : 0.0;
+    case PanRole:
+        return track ? static_cast<int>(std::lround(track->pan * 100.f)) : 0;
+    case ScorePanRole:
+        return track ? static_cast<int>(std::lround(track->scorePan * 100.f)) : 0;
     case GroupOnRole:
         return group ? group->isOn : true;
     case GroupSoloRole:
@@ -402,6 +432,8 @@ QHash<int, QByteArray> RehearsalMixerModel::roleNames() const
         { VolumeDbRole, "volumeDb" },
         { EffectiveDbRole, "effectiveDb" },
         { ScoreDbRole, "scoreDb" },
+        { PanRole, "pan" },
+        { ScorePanRole, "scorePan" },
         { GroupOnRole, "groupOn" },
         { GroupSoloRole, "groupSolo" },
         { IsExpandedRole, "isExpanded" },
@@ -675,6 +707,44 @@ void RehearsalMixerModel::setVolumeDb(int row, float db)
 
     value = db;
     onValuesChanged();
+}
+
+void RehearsalMixerModel::setPan(int row, int percent)
+{
+    if (!isValidRow(row)) {
+        return;
+    }
+
+    const Row& r = m_rows.at(row);
+    if (r.trackIndex == INVALID_MIXER_INDEX || r.type == RowType::Group || r.type == RowType::Footer) {
+        return;
+    }
+
+    const float pan = normalizedPan(static_cast<float>(percent) / 100.f);
+    float& value = m_tracks[r.trackIndex].pan;
+    if (value == pan) {
+        return;
+    }
+
+    value = pan;
+    onValuesChanged();
+}
+
+//! Every track is in the middle of the stereo image
+void RehearsalMixerModel::setAllPanCentered()
+{
+    bool changed = false;
+
+    for (Track& track : m_tracks) {
+        if (track.pan != 0.f) {
+            track.pan = 0.f;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        onValuesChanged();
+    }
 }
 
 //! Every track sounds: nothing is muted and there is no solo that silences the others
@@ -1025,6 +1095,13 @@ RehearsalMixerModel::Track RehearsalMixerModel::makeTrack(const InstrumentTrackI
         RehearsalMixerSession& session = mixerSessionFor(project);
         track.scoreDb = scoreVolumeDb(project, instrumentTrackId);
         track.state.volumeDb = track.scoreDb; // the faders start at the volume of the score
+        track.scorePan = scorePan(project, instrumentTrackId);
+        track.pan = track.scorePan; // ... and at the pan of the score
+
+        auto panIt = session.pans.find(instrumentTrackId);
+        if (panIt != session.pans.cend()) {
+            track.pan = panIt->second;
+        }
 
         auto it = session.tracks.find(instrumentTrackId);
         if (it != session.tracks.cend()) {
@@ -1164,7 +1241,7 @@ void RehearsalMixerModel::onValuesChanged()
 
     if (!m_rows.empty()) {
         emit dataChanged(index(0), index(rowCount() - 1), {
-            IsOnRole, IsSoloRole, VolumeDbRole, EffectiveDbRole, GroupOnRole, GroupSoloRole
+            IsOnRole, IsSoloRole, VolumeDbRole, EffectiveDbRole, GroupOnRole, GroupSoloRole, PanRole
         });
     }
 
@@ -1232,6 +1309,7 @@ void RehearsalMixerModel::saveSession()
 
     for (const Track& track : m_tracks) {
         session.tracks[track.state.instrumentTrackId] = track.state;
+        session.pans[track.state.instrumentTrackId] = track.pan;
     }
 
     RehearsalSessionStore& store = RehearsalSessionStore::instance();
@@ -1271,7 +1349,7 @@ SessionMix RehearsalMixerModel::calculateMix() const
         }
 
         const AbsoluteTrackMix mix = absoluteTrackMix(states[i], anySolo, m_accompanimentDb);
-        result[states[i].instrumentTrackId] = { mix.audible, mix.volumeDb - m_tracks[i].scoreDb };
+        result[states[i].instrumentTrackId] = { mix.audible, mix.volumeDb - m_tracks[i].scoreDb, m_tracks[i].pan };
     }
 
     return result;

@@ -44,6 +44,10 @@ Rectangle {
     property bool expanded: false
     signal expandToggled()
 
+    //! What the faders set: "volume" (mixer faders) or "pan" (pan sliders)
+    property string mode: "volume"
+    readonly property bool panMode: root.mode === "pan"
+
     //! The metronome fader is shown while the metronome is enabled
     property bool metronomeVisible: false
 
@@ -203,14 +207,18 @@ Rectangle {
             height: prv.touchSize
             minWidth: prv.touchSize
 
-            text: qsTrc("appshell", "All on")
+            text: root.panMode ? qsTrc("appshell", "All centered") : qsTrc("appshell", "All on")
 
             navigation.name: "AllOnButton"
             navigation.panel: headerNavPanel
             navigation.order: 2
 
             onClicked: {
-                mixer.setAllOn()
+                if (root.panMode) {
+                    mixer.setAllPanCentered()
+                } else {
+                    mixer.setAllOn()
+                }
             }
         }
     }
@@ -225,7 +233,7 @@ Rectangle {
         anchors.rightMargin: prv.margins
 
         height: visible ? accompanimentContent.height + 2 * prv.cardSpacing : 0
-        visible: mixer.hasSolo
+        visible: mixer.hasSolo && !root.panMode
 
         radius: 6
         color: prv.goldBackgroundColor
@@ -304,11 +312,70 @@ Rectangle {
         }
     }
 
+    //! Switches the faders between the volume and the pan of the tracks
+    Item {
+        id: modeRow
+
+        anchors.top: header.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: prv.margins
+        anchors.rightMargin: prv.margins
+
+        height: prv.touchSize + prv.cardSpacing
+
+        Row {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+
+            spacing: 6
+
+            FlatButton {
+                width: (parent.width - parent.spacing) / 2
+                height: prv.touchSize
+
+                text: qsTrc("appshell", "Volume")
+                accentButton: !root.panMode
+                accessible.checked: !root.panMode
+
+                toolTipTitle: qsTrc("appshell", "Set the volume of the tracks")
+
+                navigation.name: "VolumeModeButton"
+                navigation.panel: headerNavPanel
+                navigation.order: 4
+
+                onClicked: {
+                    root.mode = "volume"
+                }
+            }
+
+            FlatButton {
+                width: (parent.width - parent.spacing) / 2
+                height: prv.touchSize
+
+                text: qsTrc("appshell", "Pan")
+                accentButton: root.panMode
+                accessible.checked: root.panMode
+
+                toolTipTitle: qsTrc("appshell", "Set the position of the tracks in the stereo image")
+
+                navigation.name: "PanModeButton"
+                navigation.panel: headerNavPanel
+                navigation.order: 5
+
+                onClicked: {
+                    root.mode = "pan"
+                }
+            }
+        }
+    }
+
     //! While a part is shown: whether the whole score is played or only the voices of the part. The faders follow.
     Item {
         id: scopeRow
 
-        anchors.top: header.bottom
+        anchors.top: modeRow.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: prv.margins
@@ -379,7 +446,7 @@ Rectangle {
 
                 width: rowsColumn.width
                 height: visible ? metronomeContent.height + 2 * prv.cardSpacing : 0
-                visible: root.metronomeVisible
+                visible: root.metronomeVisible && !root.panMode
 
                 radius: 6
                 color: ui.theme.backgroundPrimaryColor
@@ -488,6 +555,8 @@ Rectangle {
                     required property bool groupSolo
                     required property bool isExpanded
                     required property int memberCount
+                    required property int pan
+                    required property int scorePan
 
                     readonly property bool isGroup: row.rowType === "group"
                     readonly property bool isMember: row.rowType === "member"
@@ -560,6 +629,10 @@ Rectangle {
                             if (row.isGroup) {
                                 //: %1 is the number of tracks in a fader group
                                 const tracks = qsTrc("appshell", "%1 tracks").arg(row.memberCount)
+
+                                if (root.panMode) {
+                                    return tracks + " · " + qsTrc("appshell", "pan per track")
+                                }
 
                                 if (!row.isOn) {
                                     return tracks + " · " + qsTrc("appshell", "muted")
@@ -761,17 +834,21 @@ Rectangle {
                                     anchors.verticalCenter: parent.verticalCenter
 
                                     font: ui.theme.bodyBoldFont
-                                    text: volumeSlider.valueText
+                                    text: root.panMode ? (row.isGroup ? "" : panSlider.valueText) : volumeSlider.valueText
                                 }
 
-                                //! A double tap on the value sets the fader to 0 dB
+                                //! A double tap on the value sets the fader to 0 dB (the pan to the one of the score)
                                 MouseArea {
                                     anchors.fill: volumeLabel
                                     anchors.margins: -8
-                                    enabled: row.isOn
+                                    enabled: row.isOn && !(root.panMode && row.isGroup)
 
                                     onDoubleClicked: {
-                                        mixer.setVolumeDb(row.index, 0)
+                                        if (root.panMode) {
+                                            mixer.setPan(row.index, row.scorePan)
+                                        } else {
+                                            mixer.setVolumeDb(row.index, 0)
+                                        }
                                     }
                                 }
                             }
@@ -780,6 +857,8 @@ Rectangle {
                                 id: volumeSlider
 
                                 width: parent.width
+
+                                visible: !root.panMode
 
                                 enabled: row.isOn
                                 from: mixer.minVolumeDb
@@ -791,11 +870,34 @@ Rectangle {
                                 navigation.name: "VolumeSlider"
                                 navigation.panel: rowNavPanel
                                 navigation.order: 4
-                                navigation.enabled: !row.isFooter
+                                navigation.enabled: !row.isFooter && !root.panMode
                                 navigation.accessible.name: row.title + " " + qsTrc("appshell", "Volume") + " " + volumeLabel.text
 
                                 onVolumeDbMoved: function(db) {
                                     mixer.setVolumeDb(row.index, db)
+                                }
+                            }
+
+                            //! The pan is set per track; a group has no pan slider of its own
+                            HorizontalPanSlider {
+                                id: panSlider
+
+                                width: parent.width
+
+                                visible: root.panMode && !row.isGroup
+                                enabled: row.isOn
+                                pan: row.pan
+                                //! A double click returns to the pan in the score
+                                defaultPan: row.scorePan
+
+                                navigation.name: "PanSlider"
+                                navigation.panel: rowNavPanel
+                                navigation.order: 4
+                                navigation.enabled: !row.isFooter && !row.isGroup && root.panMode
+                                navigation.accessible.name: row.title + " " + qsTrc("appshell", "Pan") + " " + panSlider.valueText
+
+                                onPanMoved: function(value) {
+                                    mixer.setPan(row.index, value)
                                 }
                             }
                         }
