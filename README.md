@@ -43,13 +43,15 @@ everybody is back.
 
 ### Group voices together
 
-Rehearsing the women and the men separately? Create a group like "Women" with sopranos and altos
-and control them with a single fader – or put the whole group on solo.
+Too many faders in your session? Group them together control them with a single fader –
+or put the whole group on solo.
 
 <p>
   <img src="docs/img/grouping.PNG" alt="Creating a fader group called Women" width="380">
   <img src="docs/img/grouped-fader.png" alt="The Women group with its own fader" width="300">
 </p>
+
+Open fader groups at any time to have control over the details.
 
 ### Parts at your fingertips
 
