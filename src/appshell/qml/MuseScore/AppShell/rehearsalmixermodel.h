@@ -92,7 +92,9 @@ public:
         GroupSoloRole,                  // "groupSolo": members: whether the group is solo
         IsExpandedRole,                 // "isExpanded": groups and their rows
         ScoreDbRole,                    // "scoreDb": tracks: volume in the score
-        MemberCountRole                 // "memberCount": groups
+        MemberCountRole,                // "memberCount": groups
+        PanRole,                        // "pan": tracks: -100 (left)..100 (right)
+        ScorePanRole                    // "scorePan": tracks: pan in the score
     };
 
     QVariant data(const QModelIndex& index, int role) const override;
@@ -128,6 +130,9 @@ public:
     Q_INVOKABLE void setSolo(int row, bool solo);
     Q_INVOKABLE void setVolumeDb(int row, float db);
     Q_INVOKABLE void setAllOn();
+    //! Pan of a track (not of a group) in percent: -100 (left)..100 (right)
+    Q_INVOKABLE void setPan(int row, int percent);
+    Q_INVOKABLE void setAllPanCentered();
 
     Q_INVOKABLE void toggleExpanded(int row);
 
@@ -152,6 +157,8 @@ private:
         muse::audio::TrackId trackId = -1;
         QString title;
         float scoreDb = 0.f; // volume of the track stored in the score
+        float pan = 0.f; // -1 (left)..1 (right), absolute
+        float scorePan = 0.f; // pan of the track stored in the score
     };
 
     enum class RowType {

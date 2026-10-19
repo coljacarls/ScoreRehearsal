@@ -20,7 +20,7 @@ moving a note by accident. Your score stays exactly as it is. Promise.
   "Save changes?" pop-ups, no surprises the next time you open it in MuseScore.
 - **Feels like home.** It uses the same engine and the same sounds as MuseScore, so your score looks
   and sounds just like you know it.
-- **Remembers your rehearsal.** Your mix, your groups, the part you looked at, the bar you stopped
+- **Remembers your rehearsal.** Your mix, your panning, your groups, the part you looked at, the bar you stopped
   at, even your markings: everything is waiting for you the next time you open the score.
 - **Quiet and private.** No account, no cloud, no internet connection needed.
 
@@ -52,6 +52,13 @@ or put the whole group on solo.
 </p>
 
 Open fader groups at any time to have control over the details.
+
+### Place every voice in the room
+
+Switch the tracks sidebar from **Volume** to **Pan** and every voice gets a slider to move it
+between the left and the right speaker. The sliders look different from the volume faders, so you
+always know which mode you are in. Tap or swipe to place a voice, double tap its value to return
+to the position stored in the score, and **All centered** puts everybody back in the middle.
 
 ### Parts at your fingertips
 
