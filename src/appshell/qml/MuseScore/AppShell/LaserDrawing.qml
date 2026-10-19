@@ -41,6 +41,17 @@ Item {
 
     property point offset: Qt.point(0, 0)
     property real zoom: 1
+    //! False while the paint view has no usable zoom: nothing is drawn then (the line width is divided by the zoom)
+    property bool zoomKnown: false
+
+    //! The strokes are created again for a new zoom: a shape that was created for another zoom is not painted
+    //! (the score is loaded after the page, so the strokes of a session are created for the zoom of the empty view)
+    property bool strokesCreated: true
+
+    function recreateStrokes() {
+        root.strokesCreated = false
+        Qt.callLater(function() { root.strokesCreated = true })
+    }
 
     function refresh() {
         const view = root.paintView
@@ -52,8 +63,19 @@ Item {
         const unit = view.logicalToView(Qt.rect(1, 0, 0, 0))
         const topLeft = view.mapToItem(root, origin.x, origin.y)
 
+        const zoom = unit.x - origin.x
+
+        root.zoomKnown = isFinite(zoom) && zoom > 0.0001
+        if (!root.zoomKnown) {
+            return
+        }
+
         root.offset = Qt.point(topLeft.x, topLeft.y)
-        root.zoom = Math.max(unit.x - origin.x, 0.0001)
+
+        if (Math.abs(zoom - root.zoom) > 0.0001 * zoom) {
+            root.zoom = zoom
+            root.recreateStrokes()
+        }
     }
 
     //! Rounds the corners of the polyline (Chaikin): every segment is replaced by points at 1/4 and 3/4,
@@ -99,7 +121,7 @@ Item {
         transformOrigin: Item.TopLeft
 
         Repeater {
-            model: root.strokes
+            model: root.zoomKnown && root.strokesCreated ? root.strokes : []
 
             Shape {
                 preferredRendererType: Shape.CurveRenderer
@@ -133,6 +155,7 @@ Item {
         }
 
         Shape {
+            visible: root.zoomKnown
             preferredRendererType: Shape.CurveRenderer
             ShapePath {
                 strokeColor: root.strokeColor
