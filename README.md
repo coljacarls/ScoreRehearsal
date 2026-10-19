@@ -43,7 +43,7 @@ everybody is back.
 
 ### Group voices together
 
-Too many faders in your session? Group them together control them with a single fader –
+Too many faders in your session? Group them together to control them with a single fader –
 or put the whole group on solo.
 
 <p>
