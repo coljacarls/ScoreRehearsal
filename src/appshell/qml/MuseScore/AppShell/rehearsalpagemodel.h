@@ -210,5 +210,11 @@ private:
     void relinkSession(const QString& sessionId);
     void savePlayhead();
     void clearAnnotations();
+
+    //! The measure and beat at a playback position (seconds)
+    engraving::MeasureBeat beatAt(muse::secs_t position) const;
+
+    //! Measure and beat of the last reported playback position
+    engraving::MeasureBeat m_beat;
 };
 }

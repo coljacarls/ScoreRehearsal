@@ -185,6 +185,8 @@ void RehearsalPageModel::load()
     });
 
     globalContext()->currentProjectChanged().onNotify(this, [this]() {
+        m_beat = engraving::MeasureBeat();
+
         if (auto project = globalContext()->currentProject()) {
             project->displayNameChanged().onNotify(this, [this]() {
                 emit scoreTitleChanged();
@@ -217,7 +219,10 @@ void RehearsalPageModel::load()
         emit isPlayingChanged();
     });
 
-    globalContext()->playbackState()->playbackPositionChanged().onReceive(this, [this](audio::secs_t) {
+    globalContext()->playbackState()->playbackPositionChanged().onReceive(this, [this](audio::secs_t pos) {
+        //! NOTE The position is converted here: the beat of the playback controller is updated by its own
+        //! subscription, which may not have run yet (a single seek would show and save the previous bar)
+        m_beat = beatAt(pos);
         emit playPositionChanged();
         savePlayhead();
     });
@@ -357,7 +362,7 @@ void RehearsalPageModel::restorePlayhead()
     }
 
     //! NOTE The score may have changed since: a measure number beyond the end is moved to the last measure
-    const int lastMeasure = std::max(0, playbackController()->currentBeat().maxMeasureIndex);
+    const int lastMeasure = std::max(0, beatAt(muse::secs_t(0.0)).maxMeasureIndex);
     playbackController()->seekBeat(std::min(session->playheadMeasureIndex, lastMeasure), 0, false);
 }
 
@@ -370,7 +375,7 @@ void RehearsalPageModel::savePlayhead()
 
     RehearsalSessionStore& store = RehearsalSessionStore::instance();
     RehearsalSession* session = store.findByPath(project->path().toQString());
-    const int measureIndex = playbackController()->currentBeat().measureIndex;
+    const int measureIndex = m_beat.measureIndex;
     if (!session || session->playheadMeasureIndex == measureIndex) {
         return;
     }
@@ -494,12 +499,23 @@ bool RehearsalPageModel::isMetronomeEnabled() const
 
 int RehearsalPageModel::measureNumber() const
 {
-    return playbackController()->currentBeat().measureIndex + 1;
+    return m_beat.measureIndex + 1;
 }
 
 int RehearsalPageModel::beatNumber() const
 {
-    return static_cast<int>(std::floor(playbackController()->currentBeat().beat)) + 1;
+    return static_cast<int>(std::floor(m_beat.beat)) + 1;
+}
+
+mu::engraving::MeasureBeat RehearsalPageModel::beatAt(muse::secs_t position) const
+{
+    const IMasterNotationPtr master = globalContext()->currentMasterNotation();
+    if (!master || !master->playback()) {
+        return engraving::MeasureBeat();
+    }
+
+    const INotationPlaybackPtr playback = master->playback();
+    return playback->beat(playback->secToTick(position));
 }
 
 void RehearsalPageModel::togglePlay()
