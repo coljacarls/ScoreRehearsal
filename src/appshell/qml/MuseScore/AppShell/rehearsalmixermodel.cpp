@@ -32,6 +32,7 @@
 #include <QJsonObject>
 
 #include "async/notifylist.h"
+#include "audio/common/audioutils.h"
 #include "log.h"
 #include "translation.h"
 
@@ -137,6 +138,9 @@ struct RehearsalMixerSession {
     std::unordered_map<InstrumentTrackId, float> legacyRelativeDb;
     //! Pan of the tracks that were set once, -1 (left)..1 (right)
     std::unordered_map<InstrumentTrackId, float> pans;
+    //! Playback instruments (see playbackInstrumentKey) the user chose for tracks
+    std::unordered_map<InstrumentTrackId, QString> instruments;
+    QStringList favoriteInstruments;
 };
 
 QString trackKey(const InstrumentTrackId& id)
@@ -196,7 +200,14 @@ QJsonObject mixerToJson(const RehearsalMixerSession& session)
         });
     }
 
+    QJsonObject instruments;
+    for (const auto& [id, key] : session.instruments) {
+        instruments[trackKey(id)] = key;
+    }
+
     QJsonObject result {
+        { "instruments", instruments },
+        { "favoriteInstruments", QJsonArray::fromStringList(session.favoriteInstruments) },
         { "accompanimentDb", static_cast<double>(session.accompanimentDb) },
         { "nextGroupId", session.nextGroupId },
         { "shownPartOnly", session.shownPartOnly },
@@ -248,6 +259,20 @@ void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
 
         if (o.contains("pan")) {
             session.pans[*id] = normalizedPan(static_cast<float>(o.value("pan").toDouble()));
+        }
+    }
+
+    const QJsonObject instruments = json.value("instruments").toObject();
+    for (auto it = instruments.begin(); it != instruments.end(); ++it) {
+        const std::optional<InstrumentTrackId> id = trackIdFromKey(it.key());
+        if (id && !it.value().toString().isEmpty()) {
+            session.instruments[*id] = it.value().toString();
+        }
+    }
+
+    for (const QJsonValue& value : json.value("favoriteInstruments").toArray()) {
+        if (!value.toString().isEmpty() && !session.favoriteInstruments.contains(value.toString())) {
+            session.favoriteInstruments << value.toString();
         }
     }
 
@@ -394,6 +419,8 @@ QVariant RehearsalMixerModel::data(const QModelIndex& index, int role) const
         return track ? static_cast<int>(std::lround(track->pan * 100.f)) : 0;
     case ScorePanRole:
         return track ? static_cast<int>(std::lround(track->scorePan * 100.f)) : 0;
+    case InstrumentNameRole:
+        return track ? track->instrumentName : groupInstrumentName(row.groupIndex);
     case GroupOnRole:
         return group ? group->isOn : true;
     case GroupSoloRole:
@@ -434,6 +461,7 @@ QHash<int, QByteArray> RehearsalMixerModel::roleNames() const
         { ScoreDbRole, "scoreDb" },
         { PanRole, "pan" },
         { ScorePanRole, "scorePan" },
+        { InstrumentNameRole, "instrumentName" },
         { GroupOnRole, "groupOn" },
         { GroupSoloRole, "groupSolo" },
         { IsExpandedRole, "isExpanded" },
@@ -967,7 +995,12 @@ void RehearsalMixerModel::reload()
 
     for (const Track& track : m_tracks) {
         requestTitle(track.trackId);
+        requestInstrument(track.trackId);
     }
+
+    requestInstrumentCatalog();
+
+    emit favoriteInstrumentsChanged();
 
     loadMetronome();
     saveSession();
@@ -1011,6 +1044,7 @@ void RehearsalMixerModel::onTrackAdded(const TrackId trackId)
     saveSession();
 
     requestTitle(trackId);
+    requestInstrument(trackId);
 
     updateHasSolo();
     updateMixOverride();
@@ -1031,6 +1065,289 @@ void RehearsalMixerModel::onTrackRemoved(const TrackId trackId)
     updateMixOverride();
 }
 
+QVariantList RehearsalMixerModel::instrumentTree() const
+{
+    return m_instrumentCatalog.tree;
+}
+
+QStringList RehearsalMixerModel::favoriteInstrumentKeys() const
+{
+    const INotationProjectPtr project = context()->currentProject();
+    return project ? mixerSessionFor(project).favoriteInstruments : QStringList();
+}
+
+QVariantList RehearsalMixerModel::favoriteInstruments() const
+{
+    QVariantList result;
+
+    for (const QString& key : favoriteInstrumentKeys()) {
+        auto it = m_instrumentCatalog.items.constFind(key);
+        if (it == m_instrumentCatalog.items.cend()) {
+            continue; // not installed (any more)
+        }
+
+        QVariantMap item = it.value();
+        item["children"] = QVariantList();
+        result << item;
+    }
+
+    return result;
+}
+
+QVariantList RehearsalMixerModel::instrumentTargets() const
+{
+    const auto trackTarget = [this](int trackIndex, int indent) {
+        const Track& track = m_tracks.at(trackIndex);
+        return QVariantMap {
+            { "kind", QStringLiteral("track") },
+            { "index", trackIndex },
+            { "title", track.title },
+            { "instrumentName", track.instrumentName },
+            { "instrumentKey", track.instrumentKey },
+            { "indent", indent }
+        };
+    };
+
+    QVariantList result;
+    std::vector<bool> groupAdded(m_groups.size(), false);
+
+    for (size_t trackIndex = 0; trackIndex < m_tracks.size(); ++trackIndex) {
+        const int groupIndex = groupIndexOfTrack(m_tracks[trackIndex].state.instrumentTrackId);
+
+        if (groupIndex == INVALID_MIXER_INDEX) {
+            result << trackTarget(static_cast<int>(trackIndex), 0);
+            continue;
+        }
+
+        if (groupAdded[groupIndex]) {
+            continue;
+        }
+
+        groupAdded[groupIndex] = true;
+
+        const FaderGroup& group = m_groups[groupIndex];
+        result << QVariantMap {
+            { "kind", QStringLiteral("group") },
+            { "index", groupIndex },
+            { "title", group.name },
+            { "instrumentName", groupInstrumentName(groupIndex) },
+            { "instrumentKey", groupInstrumentKey(groupIndex) },
+            { "indent", 0 }
+        };
+
+        for (const InstrumentTrackId& member : group.members) {
+            const int memberIndex = indexOfTrack(member);
+            if (memberIndex != INVALID_MIXER_INDEX) {
+                result << trackTarget(memberIndex, 1);
+            }
+        }
+    }
+
+    return result;
+}
+
+//! The key all members of the group play with, empty if they differ (or none is known yet)
+QString RehearsalMixerModel::groupInstrumentKey(int groupIndex) const
+{
+    QString common;
+
+    for (const InstrumentTrackId& member : m_groups.at(groupIndex).members) {
+        const int memberIndex = indexOfTrack(member);
+        if (memberIndex == INVALID_MIXER_INDEX || m_tracks.at(memberIndex).instrumentKey.isEmpty()) {
+            continue;
+        }
+
+        const QString& key = m_tracks.at(memberIndex).instrumentKey;
+        if (common.isEmpty()) {
+            common = key;
+        } else if (common != key) {
+            return QString();
+        }
+    }
+
+    return common;
+}
+
+QString RehearsalMixerModel::groupInstrumentName(int groupIndex) const
+{
+    if (groupIndex < 0 || groupIndex >= static_cast<int>(m_groups.size())) {
+        return QString();
+    }
+
+    const std::vector<InstrumentTrackId>& members = m_groups.at(groupIndex).members;
+    const QString key = groupInstrumentKey(groupIndex);
+
+    if (key.isEmpty()) {
+        //! No common instrument: either they differ, or none is known yet
+        const bool anyKnown = std::any_of(members.cbegin(), members.cend(), [this](const InstrumentTrackId& member) {
+            const int memberIndex = indexOfTrack(member);
+            return memberIndex != INVALID_MIXER_INDEX && !m_tracks.at(memberIndex).instrumentKey.isEmpty();
+        });
+
+        return anyKnown ? qtrc("appshell", "Various") : QString();
+    }
+
+    for (const InstrumentTrackId& member : members) {
+        const int memberIndex = indexOfTrack(member);
+        if (memberIndex != INVALID_MIXER_INDEX && m_tracks.at(memberIndex).instrumentKey == key) {
+            return m_tracks.at(memberIndex).instrumentName;
+        }
+    }
+
+    return QString();
+}
+
+QVariantList RehearsalMixerModel::instrumentPath(const QString& instrumentKey) const
+{
+    QVariantList result;
+    for (int index : m_instrumentCatalog.paths.value(instrumentKey)) {
+        result << index;
+    }
+
+    return result;
+}
+
+void RehearsalMixerModel::requestInstrumentCatalog()
+{
+    if (m_instrumentCatalogLoaded || !controller()->isPlaybackInited()) {
+        return;
+    }
+
+    playback()->availableInputResources()
+    .onResolve(this, [this](const AudioResourceMetaList& resources) {
+        m_instrumentCatalog = buildPlaybackInstrumentCatalog(resources);
+        m_instrumentCatalogLoaded = !m_instrumentCatalog.isEmpty();
+
+        emit instrumentCatalogChanged();
+        emit favoriteInstrumentsChanged();
+
+        //! The instruments chosen in the session can be applied now
+        for (const Track& track : m_tracks) {
+            requestInstrument(track.trackId);
+        }
+    })
+    .onReject(this, [](const int errCode, const std::string& errText) {
+        LOGE() << "unable to get the available playback instruments, error code: " << errCode << ", " << errText;
+    });
+}
+
+void RehearsalMixerModel::requestInstrument(const TrackId trackId)
+{
+    playback()->params(trackId)
+    .onResolve(this, [this, trackId](const TrackParams& params) {
+        const int trackIndex = indexOfTrack(trackId);
+        const INotationProjectPtr project = context()->currentProject();
+        if (trackIndex == INVALID_MIXER_INDEX || !project) {
+            return;
+        }
+
+        const RehearsalMixerSession& session = mixerSessionFor(project);
+
+        //! The instrument the user chose wins over the one of the score
+        auto chosen = session.instruments.find(m_tracks.at(trackIndex).state.instrumentTrackId);
+        if (m_instrumentCatalogLoaded && chosen != session.instruments.cend()) {
+            auto resource = m_instrumentCatalog.resources.constFind(chosen->second);
+            if (resource != m_instrumentCatalog.resources.cend()) {
+                const AudioSourceParams source { resource.value(), {} };
+
+                if (playbackInstrumentKey(params.source.resourceMeta) != chosen->second) {
+                    playback()->setSourceParams(trackId, source);
+                }
+
+                setTrackInstrument(trackIndex, chosen->second, audioSourceName(source).toQString());
+                return;
+            }
+        }
+
+        setTrackInstrument(trackIndex, playbackInstrumentKey(params.source.resourceMeta), audioSourceName(params.source).toQString());
+    })
+    .onReject(this, [](const int errCode, const std::string& errText) {
+        LOGE() << "unable to get the params of the track, error code: " << errCode << ", " << errText;
+    });
+}
+
+void RehearsalMixerModel::setTrackInstrument(int trackIndex, const QString& key, const QString& name)
+{
+    Track& track = m_tracks[trackIndex];
+    if (track.instrumentKey == key && track.instrumentName == name) {
+        return;
+    }
+
+    track.instrumentKey = key;
+    track.instrumentName = name;
+
+    if (!m_rows.empty()) {
+        emit dataChanged(index(0), index(rowCount() - 1), { InstrumentNameRole });
+    }
+
+    emit instrumentsChanged();
+}
+
+void RehearsalMixerModel::setInstrument(const QString& kind, int index, const QString& instrumentKey)
+{
+    const INotationProjectPtr project = context()->currentProject();
+    auto resource = m_instrumentCatalog.resources.constFind(instrumentKey);
+    if (!project || resource == m_instrumentCatalog.resources.cend()) {
+        return;
+    }
+
+    std::vector<InstrumentTrackId> ids;
+    if (kind == QStringLiteral("group")) {
+        if (index < 0 || index >= static_cast<int>(m_groups.size())) {
+            return;
+        }
+
+        //! Also members whose track is not there right now: they get it when they come back
+        ids = m_groups.at(index).members;
+    } else {
+        if (index < 0 || index >= static_cast<int>(m_tracks.size())) {
+            return;
+        }
+
+        ids.push_back(m_tracks.at(index).state.instrumentTrackId);
+    }
+
+    RehearsalMixerSession& session = mixerSessionFor(project);
+    const AudioSourceParams source { resource.value(), {} };
+    const QString name = audioSourceName(source).toQString();
+
+    for (const InstrumentTrackId& id : ids) {
+        session.instruments[id] = instrumentKey;
+
+        const int trackIndex = indexOfTrack(id);
+        if (trackIndex == INVALID_MIXER_INDEX) {
+            continue;
+        }
+
+        if (m_tracks.at(trackIndex).instrumentKey != instrumentKey) {
+            playback()->setSourceParams(m_tracks.at(trackIndex).trackId, source);
+        }
+
+        setTrackInstrument(trackIndex, instrumentKey, name);
+    }
+
+    saveSession();
+}
+
+void RehearsalMixerModel::toggleFavoriteInstrument(const QString& instrumentKey)
+{
+    const INotationProjectPtr project = context()->currentProject();
+    if (!project || instrumentKey.isEmpty()) {
+        return;
+    }
+
+    QStringList& favorites = mixerSessionFor(project).favoriteInstruments;
+    if (favorites.contains(instrumentKey)) {
+        favorites.removeAll(instrumentKey);
+    } else {
+        favorites << instrumentKey;
+    }
+
+    emit favoriteInstrumentsChanged();
+    saveSession();
+}
+
+
 void RehearsalMixerModel::requestTitle(const TrackId trackId)
 {
     playback()->trackName(trackId)
@@ -1046,6 +1363,7 @@ void RehearsalMixerModel::requestTitle(const TrackId trackId)
         }
 
         m_tracks[trackIndex].title = plainTrackTitle(QString::fromStdString(trackName.val));
+        emit instrumentsChanged();
 
         for (size_t i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].trackIndex == trackIndex) {
@@ -1164,6 +1482,7 @@ void RehearsalMixerModel::rebuildRows()
     endResetModel();
 
     emit structureChanged();
+    emit instrumentsChanged();
 }
 
 std::vector<RehearsalMixerModel::Row> RehearsalMixerModel::buildRows() const

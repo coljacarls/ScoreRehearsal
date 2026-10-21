@@ -40,6 +40,7 @@
 #include "playback/internal/rehearsalmix.h"
 
 #include "fadergroups.h"
+#include "playbackinstruments.h"
 
 namespace mu::appshell {
 //! Track faders of the rehearsal page with fader groups.
@@ -69,6 +70,14 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     Q_PROPERTY(bool shownPartOnly READ shownPartOnly WRITE setShownPartOnly NOTIFY scopeChanged)
     //! Whether the tracks are limited to the ones of the shown part right now (a part is shown and shownPartOnly)
     Q_PROPERTY(bool partScopeActive READ partScopeActive NOTIFY scopeChanged)
+    //! The playback instruments to choose from (see PlaybackInstrumentCatalog::tree)
+    Q_PROPERTY(QVariantList instrumentTree READ instrumentTree NOTIFY instrumentCatalogChanged)
+    //! The voices (and fader groups) the playback instruments can be set for:
+    //! [{ kind: "track" | "group", index, title, instrumentName, instrumentKey, indent }]
+    Q_PROPERTY(QVariantList instrumentTargets READ instrumentTargets NOTIFY instrumentsChanged)
+    //! The favorite instruments, as nodes of the tree: [{ key, title, subtitle }]
+    Q_PROPERTY(QVariantList favoriteInstruments READ favoriteInstruments NOTIFY favoriteInstrumentsChanged)
+    Q_PROPERTY(QStringList favoriteInstrumentKeys READ favoriteInstrumentKeys NOTIFY favoriteInstrumentsChanged)
 
     QML_ELEMENT
 
@@ -94,7 +103,8 @@ public:
         ScoreDbRole,                    // "scoreDb": tracks: volume in the score
         MemberCountRole,                // "memberCount": groups
         PanRole,                        // "pan": tracks: -100 (left)..100 (right)
-        ScorePanRole                    // "scorePan": tracks: pan in the score
+        ScorePanRole,                   // "scorePan": tracks: pan in the score
+        InstrumentNameRole              // "instrumentName": playback instrument; groups: the common one or "Various"
     };
 
     QVariant data(const QModelIndex& index, int role) const override;
@@ -126,6 +136,11 @@ public:
     void setShownPartOnly(bool only);
     bool partScopeActive() const;
 
+    QVariantList instrumentTree() const;
+    QVariantList instrumentTargets() const;
+    QVariantList favoriteInstruments() const;
+    QStringList favoriteInstrumentKeys() const;
+
     Q_INVOKABLE void setOn(int row, bool on);
     Q_INVOKABLE void setSolo(int row, bool solo);
     Q_INVOKABLE void setVolumeDb(int row, float db);
@@ -143,7 +158,17 @@ public:
     Q_INVOKABLE bool createGroup(const QString& name, const QVariantList& trackKeys);
     Q_INVOKABLE void dissolveGroup(int row);
 
+    //! Plays a voice (kind "track", index of instrumentTargets) or all voices of a fader group (kind "group")
+    //! with the instrument; the choice is part of the session
+    Q_INVOKABLE void setInstrument(const QString& kind, int index, const QString& instrumentKey);
+    Q_INVOKABLE void toggleFavoriteInstrument(const QString& instrumentKey);
+    //! The indexes to follow in instrumentTree to reach the instrument; empty if it is not there
+    Q_INVOKABLE QVariantList instrumentPath(const QString& instrumentKey) const;
+
 signals:
+    void instrumentCatalogChanged();
+    void instrumentsChanged();
+    void favoriteInstrumentsChanged();
     void hasSoloChanged();
     void soloPartIdsChanged();
     void accompanimentDbChanged();
@@ -159,6 +184,8 @@ private:
         float scoreDb = 0.f; // volume of the track stored in the score
         float pan = 0.f; // -1 (left)..1 (right), absolute
         float scorePan = 0.f; // pan of the track stored in the score
+        QString instrumentKey; // the playback instrument right now (empty until known)
+        QString instrumentName;
     };
 
     enum class RowType {
@@ -181,6 +208,13 @@ private:
     void onTrackAdded(const muse::audio::TrackId trackId);
     void onTrackRemoved(const muse::audio::TrackId trackId);
     void requestTitle(const muse::audio::TrackId trackId);
+
+    //! Reads the playback instrument of the track and, if the session chose another one, applies that
+    void requestInstrument(const muse::audio::TrackId trackId);
+    void requestInstrumentCatalog();
+    void setTrackInstrument(int trackIndex, const QString& key, const QString& name);
+    QString groupInstrumentName(int groupIndex) const;
+    QString groupInstrumentKey(int groupIndex) const;
 
     std::vector<engraving::InstrumentTrackId> orderedInstrumentTrackIds() const;
     Track makeTrack(const engraving::InstrumentTrackId& instrumentTrackId, const muse::audio::TrackId trackId) const;
@@ -228,6 +262,9 @@ private:
     bool m_hasSolo = false;
     QStringList m_soloPartIds;
     bool m_overrideApplied = false;
+
+    PlaybackInstrumentCatalog m_instrumentCatalog;
+    bool m_instrumentCatalogLoaded = false;
 
     bool m_isPartShown = false;
     bool m_shownPartOnly = false;

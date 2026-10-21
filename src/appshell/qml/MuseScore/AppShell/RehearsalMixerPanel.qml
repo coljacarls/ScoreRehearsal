@@ -24,6 +24,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 
 import Muse.Ui
 import Muse.UiComponents
@@ -53,6 +54,9 @@ Rectangle {
 
     //! The page opens the dialog to create a fader group
     signal createGroupRequested()
+
+    //! The page opens the dialog to set the playback instruments of the tracks
+    signal playbackInstrumentsRequested()
 
     color: ui.theme.backgroundSecondaryColor
 
@@ -163,7 +167,7 @@ Rectangle {
 
             anchors.left: expandPanelButton.right
             anchors.leftMargin: 4
-            anchors.right: newGroupButton.left
+            anchors.right: allOnButton.left
             anchors.rightMargin: prv.cardSpacing
             anchors.verticalCenter: parent.verticalCenter
 
@@ -173,35 +177,10 @@ Rectangle {
         }
 
         FlatButton {
-            id: newGroupButton
-
-            anchors.right: allOnButton.left
-            anchors.rightMargin: 6
-            anchors.verticalCenter: parent.verticalCenter
-
-            height: prv.touchSize
-            minWidth: prv.touchSize
-
-            icon: IconCode.PLUS
-            text: qsTrc("appshell", "Group")
-            orientation: Qt.Horizontal
-
-            toolTipTitle: qsTrc("appshell", "New fader group")
-            enabled: mixer.ungroupedTrackCount > 0
-
-            navigation.name: "NewGroupButton"
-            navigation.panel: headerNavPanel
-            navigation.order: 1
-
-            onClicked: {
-                root.createGroupRequested()
-            }
-        }
-
-        FlatButton {
             id: allOnButton
 
-            anchors.right: parent.right
+            anchors.right: optionsButton.left
+            anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
 
             height: prv.touchSize
@@ -211,13 +190,53 @@ Rectangle {
 
             navigation.name: "AllOnButton"
             navigation.panel: headerNavPanel
-            navigation.order: 2
+            navigation.order: 1
 
             onClicked: {
                 if (root.panMode) {
                     mixer.setAllPanCentered()
                 } else {
                     mixer.setAllOn()
+                }
+            }
+        }
+
+        FlatButton {
+            id: optionsButton
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+
+            width: prv.touchSize
+            height: prv.touchSize
+
+            icon: IconCode.MENU_THREE_DOTS
+            transparent: !optionsMenu.isMenuOpened
+            accentButton: optionsMenu.isMenuOpened
+
+            toolTipTitle: qsTrc("appshell", "Options")
+
+            navigation.name: "OptionsButton"
+            navigation.panel: headerNavPanel
+            navigation.order: 2
+
+            onClicked: {
+                optionsMenu.toggleOpened([
+                    { id: "newGroup", title: qsTrc("appshell", "New fader group…"), enabled: mixer.ungroupedTrackCount > 0 },
+                    { id: "instruments", title: qsTrc("appshell", "Playback instruments…") }
+                ])
+            }
+
+            StyledMenuLoader {
+                id: optionsMenu
+
+                menuAnchorItem: root.Window.window ? root.Window.window.contentItem : null
+
+                onHandleMenuItem: function(itemId) {
+                    switch (itemId) {
+                    case "newGroup": root.createGroupRequested(); break
+                    case "instruments": root.playbackInstrumentsRequested(); break
+                    }
                 }
             }
         }
@@ -557,6 +576,7 @@ Rectangle {
                     required property int memberCount
                     required property int pan
                     required property int scorePan
+                    required property string instrumentName
 
                     readonly property bool isGroup: row.rowType === "group"
                     readonly property bool isMember: row.rowType === "member"
@@ -626,6 +646,10 @@ Rectangle {
                         id: card
 
                         readonly property string statusText: {
+                            if (row.instrumentName !== "") {
+                                return row.instrumentName
+                            }
+
                             if (row.isGroup) {
                                 //: %1 is the number of tracks in a fader group
                                 const tracks = qsTrc("appshell", "%1 tracks").arg(row.memberCount)
