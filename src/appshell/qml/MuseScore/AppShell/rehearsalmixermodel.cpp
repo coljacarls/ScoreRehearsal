@@ -27,6 +27,7 @@
 #include <cmath>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -141,6 +142,8 @@ struct RehearsalMixerSession {
     //! Playback instruments (see playbackInstrumentKey) the user chose for tracks
     std::unordered_map<InstrumentTrackId, QString> instruments;
     QStringList favoriteInstruments;
+    //! Tracks whose instrument was picked from the favorites (not from the categories)
+    std::unordered_set<InstrumentTrackId> instrumentsViaFavorites;
 };
 
 QString trackKey(const InstrumentTrackId& id)
@@ -205,8 +208,14 @@ QJsonObject mixerToJson(const RehearsalMixerSession& session)
         instruments[trackKey(id)] = key;
     }
 
+    QJsonArray viaFavorites;
+    for (const InstrumentTrackId& id : session.instrumentsViaFavorites) {
+        viaFavorites.append(trackKey(id));
+    }
+
     QJsonObject result {
         { "instruments", instruments },
+        { "instrumentsViaFavorites", viaFavorites },
         { "favoriteInstruments", QJsonArray::fromStringList(session.favoriteInstruments) },
         { "accompanimentDb", static_cast<double>(session.accompanimentDb) },
         { "nextGroupId", session.nextGroupId },
@@ -267,6 +276,12 @@ void mixerFromJson(const QJsonObject& json, RehearsalMixerSession& session)
         const std::optional<InstrumentTrackId> id = trackIdFromKey(it.key());
         if (id && !it.value().toString().isEmpty()) {
             session.instruments[*id] = it.value().toString();
+        }
+    }
+
+    for (const QJsonValue& value : json.value("instrumentsViaFavorites").toArray()) {
+        if (const std::optional<InstrumentTrackId> id = trackIdFromKey(value.toString())) {
+            session.instrumentsViaFavorites.insert(*id);
         }
     }
 
@@ -1096,7 +1111,21 @@ QVariantList RehearsalMixerModel::favoriteInstruments() const
 
 QVariantList RehearsalMixerModel::instrumentTargets() const
 {
-    const auto trackTarget = [this](int trackIndex, int indent) {
+    const INotationProjectPtr project = context()->currentProject();
+
+    //! Whether the instrument of all the tracks was picked from the favorites
+    const auto isViaFavorites = [&project](const std::vector<InstrumentTrackId>& ids) {
+        if (!project || ids.empty()) {
+            return false;
+        }
+
+        const auto& viaFavorites = mixerSessionFor(project).instrumentsViaFavorites;
+        return std::all_of(ids.cbegin(), ids.cend(), [&viaFavorites](const InstrumentTrackId& id) {
+            return viaFavorites.count(id) != 0;
+        });
+    };
+
+    const auto trackTarget = [this, &isViaFavorites](int trackIndex, int indent) {
         const Track& track = m_tracks.at(trackIndex);
         return QVariantMap {
             { "kind", QStringLiteral("track") },
@@ -1104,6 +1133,7 @@ QVariantList RehearsalMixerModel::instrumentTargets() const
             { "title", track.title },
             { "instrumentName", track.instrumentName },
             { "instrumentKey", track.instrumentKey },
+            { "viaFavorites", isViaFavorites({ track.state.instrumentTrackId }) },
             { "indent", indent }
         };
     };
@@ -1132,6 +1162,7 @@ QVariantList RehearsalMixerModel::instrumentTargets() const
             { "title", group.name },
             { "instrumentName", groupInstrumentName(groupIndex) },
             { "instrumentKey", groupInstrumentKey(groupIndex) },
+            { "viaFavorites", isViaFavorites(group.members) },
             { "indent", 0 }
         };
 
@@ -1283,7 +1314,7 @@ void RehearsalMixerModel::setTrackInstrument(int trackIndex, const QString& key,
     emit instrumentsChanged();
 }
 
-void RehearsalMixerModel::setInstrument(const QString& kind, int index, const QString& instrumentKey)
+void RehearsalMixerModel::setInstrument(const QString& kind, int index, const QString& instrumentKey, bool viaFavorites)
 {
     const INotationProjectPtr project = context()->currentProject();
     auto resource = m_instrumentCatalog.resources.constFind(instrumentKey);
@@ -1313,6 +1344,11 @@ void RehearsalMixerModel::setInstrument(const QString& kind, int index, const QS
 
     for (const InstrumentTrackId& id : ids) {
         session.instruments[id] = instrumentKey;
+        if (viaFavorites) {
+            session.instrumentsViaFavorites.insert(id);
+        } else {
+            session.instrumentsViaFavorites.erase(id);
+        }
 
         const int trackIndex = indexOfTrack(id);
         if (trackIndex == INVALID_MIXER_INDEX) {

@@ -73,7 +73,7 @@ class RehearsalMixerModel : public QAbstractListModel, public QQmlParserStatus, 
     //! The playback instruments to choose from (see PlaybackInstrumentCatalog::tree)
     Q_PROPERTY(QVariantList instrumentTree READ instrumentTree NOTIFY instrumentCatalogChanged)
     //! The voices (and fader groups) the playback instruments can be set for:
-    //! [{ kind: "track" | "group", index, title, instrumentName, instrumentKey, indent }]
+    //! [{ kind: "track" | "group", index, title, instrumentName, instrumentKey, viaFavorites, indent }]
     Q_PROPERTY(QVariantList instrumentTargets READ instrumentTargets NOTIFY instrumentsChanged)
     //! The favorite instruments, as nodes of the tree: [{ key, title, subtitle }]
     Q_PROPERTY(QVariantList favoriteInstruments READ favoriteInstruments NOTIFY favoriteInstrumentsChanged)
@@ -160,7 +160,8 @@ public:
 
     //! Plays a voice (kind "track", index of instrumentTargets) or all voices of a fader group (kind "group")
     //! with the instrument; the choice is part of the session
-    Q_INVOKABLE void setInstrument(const QString& kind, int index, const QString& instrumentKey);
+    //! viaFavorites: the instrument was picked from the favorites, so the dialog opens there the next time
+    Q_INVOKABLE void setInstrument(const QString& kind, int index, const QString& instrumentKey, bool viaFavorites);
     Q_INVOKABLE void toggleFavoriteInstrument(const QString& instrumentKey);
     //! The indexes to follow in instrumentTree to reach the instrument; empty if it is not there
     Q_INVOKABLE QVariantList instrumentPath(const QString& instrumentKey) const;

@@ -80,23 +80,43 @@ FocusScope {
             const favorites = root.mixerModel.favoriteInstruments
 
             if (favorites.length > 0) {
-                nodes.push({ title: qsTrc("appshell", "Favorites"), subtitle: "", key: "", children: favorites })
+                nodes.push({ title: qsTrc("appshell", "Favorites"), subtitle: "", key: "", isFavorites: true, children: favorites })
             }
 
             return nodes.concat(root.mixerModel.instrumentTree)
         }
 
+        //! The nodes of each column (the model of the columns only holds them as JSON, to keep them plain JS values)
+        property var columnNodes: []
+
+        function appendColumn(nodes) {
+            prv.columnNodes.push(nodes)
+            columnsModel.append({ json: JSON.stringify(nodes), selected: -1 })
+        }
+
         //! Fills the first column and opens the path to the instrument of the target
         function rebuildColumns() {
             columnsModel.clear()
-            columnsModel.append({ nodes: prv.rootNodes(), selected: -1 })
+            prv.columnNodes = []
+            prv.appendColumn(prv.rootNodes())
 
             if (!prv.target || prv.target.instrumentKey === "") {
                 return
             }
 
+            //! Picked from the favorites the last time: open them, so that the instrument can be changed there
+            const favorites = columnsModel.count > 0 && prv.columnNodes[0].length > 0 && prv.columnNodes[0][0].isFavorites
+                              ? prv.columnNodes[0][0].children : []
+            const favoriteIndex = favorites.findIndex(item => item.key === prv.target.instrumentKey)
+
+            if (prv.target.viaFavorites && favoriteIndex !== -1) {
+                prv.select(0, 0)
+                prv.select(1, favoriteIndex)
+                return
+            }
+
             const path = root.mixerModel.instrumentPath(prv.target.instrumentKey)
-            const offset = columnsModel.get(0).nodes.length - root.mixerModel.instrumentTree.length
+            const offset = prv.columnNodes[0].length - root.mixerModel.instrumentTree.length
 
             for (let level = 0; level < path.length; ++level) {
                 const index = path[level] + (level === 0 ? offset : 0)
@@ -106,20 +126,21 @@ FocusScope {
 
         //! Selects a node of a column: the columns right of it show its children
         function select(column, index) {
-            const nodes = columnsModel.get(column).nodes
-            if (index < 0 || index >= nodes.length) {
+            const nodes = prv.columnNodes[column]
+            if (!nodes || index < 0 || index >= nodes.length) {
                 return
             }
 
             while (columnsModel.count > column + 1) {
                 columnsModel.remove(columnsModel.count - 1)
+                prv.columnNodes.pop()
             }
 
             columnsModel.setProperty(column, "selected", index)
 
             const children = nodes[index].children
             if (children && children.length > 0) {
-                columnsModel.append({ nodes: children, selected: -1 })
+                prv.appendColumn(children)
             }
 
             Qt.callLater(function() {
@@ -133,11 +154,14 @@ FocusScope {
         }
 
         function choose(column, index) {
-            const node = columnsModel.get(column).nodes[index]
+            const node = prv.columnNodes[column][index]
             prv.select(column, index)
 
             if (node.key !== "" && prv.target) {
-                root.mixerModel.setInstrument(prv.target.kind, prv.target.index, node.key)
+                //! The first column starts with the favorites when there are any
+                const viaFavorites = column > 0 && !!prv.columnNodes[0][0] && !!prv.columnNodes[0][0].isFavorites
+                                     && columnsModel.get(0).selected === 0
+                root.mixerModel.setInstrument(prv.target.kind, prv.target.index, node.key, viaFavorites)
             }
         }
     }
@@ -161,8 +185,6 @@ FocusScope {
 
     ListModel {
         id: columnsModel
-
-        dynamicRoles: true
     }
 
     NavigationPanel {
@@ -375,8 +397,10 @@ FocusScope {
                             id: column
 
                             required property int index
-                            required property var nodes
+                            required property string json
                             required property int selected
+
+                            readonly property var nodes: JSON.parse(column.json)
 
                             width: prv.columnWidth
                             height: columnsRow.height
