@@ -441,6 +441,10 @@ Item {
             onCreateGroupRequested: {
                 faderGroupDialog.open()
             }
+
+            onPlaybackInstrumentsRequested: {
+                playbackInstrumentsDialog.open()
+            }
         }
 
         //! Floating tools over the score: hand, laser pointer and its tools
@@ -572,6 +576,24 @@ Item {
 
         mixerModel: tracksPanel.mixerModel
         navigationSection: faderGroupDialogNavSec
+    }
+
+    NavigationSection {
+        id: playbackInstrumentsNavSec
+        name: "PlaybackInstrumentsDialog"
+        enabled: playbackInstrumentsDialog.visible
+        order: 9
+    }
+
+    //! Modal dialog to set the playback instruments of the voices, over the whole page
+    PlaybackInstrumentsDialog {
+        id: playbackInstrumentsDialog
+
+        anchors.fill: parent
+        z: 100
+
+        mixerModel: tracksPanel.mixerModel
+        navigationSection: playbackInstrumentsNavSec
     }
 
     NavigationSection {

@@ -38,6 +38,8 @@ qt_add_qml_module(appshell_qml
         offstreamplayback.h
         pitchpipe.cpp
         pitchpipe.h
+        playbackinstruments.cpp
+        playbackinstruments.h
         presentationpaintview.cpp
         presentationpaintview.h
         presentationsettings.h
@@ -58,6 +60,7 @@ qt_add_qml_module(appshell_qml
         AppWindow.qml
         AudioSettingsDialog.qml
         FaderGroupDialog.qml
+        PlaybackInstrumentsDialog.qml
         LaserDrawing.qml
         LaserHighlight.qml
         LaserPointerButton.qml
