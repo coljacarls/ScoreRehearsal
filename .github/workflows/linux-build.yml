@@ -66,10 +66,9 @@ jobs:
 
       - name: Smoke test
         # still running after the timeout (exit code 124) means the app started without crashing
-        continue-on-error: true
         run: |
           set +e
-          MU_QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 20 dist/ScoreRehearsal-*.AppImage
+          QT_QPA_PLATFORM=offscreen MU_QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 20 dist/ScoreRehearsal-*.AppImage
           code=$?
           echo "exit code: $code"
           [ "$code" = 124 ] || [ "$code" = 0 ]
