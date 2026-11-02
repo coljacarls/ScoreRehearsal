@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+# AppImage entry point of ScoreRehearsal.
+
+HERE="$(dirname "$(readlink -f "$0")")"
+export APPDIR="${APPDIR:-$HERE}"
+
+# Bundled fallback libraries (fallback/<lib>/<lib>) are only used if the system has no copy.
+SYSTEM_LIBS="$( (/sbin/ldconfig -p || ldconfig -p) 2>/dev/null)"
+for dir in "$APPDIR"/fallback/*/; do
+    [ -d "$dir" ] || continue
+    lib="$(basename "$dir")"
+    case "$SYSTEM_LIBS" in
+        *"$lib "*) ;;
+        *) export LD_LIBRARY_PATH="${dir%/}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+    esac
+done
+
+exec "$APPDIR/bin/ScoreRehearsal" "$@"
