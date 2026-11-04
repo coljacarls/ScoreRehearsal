@@ -78,6 +78,7 @@ class RehearsalPageModel : public QObject, public muse::Contextable, public muse
     Q_PROPERTY(bool isMetronomeEnabled READ isMetronomeEnabled NOTIFY isMetronomeEnabledChanged)
     Q_PROPERTY(int measureNumber READ measureNumber NOTIFY playPositionChanged)
     Q_PROPERTY(int beatNumber READ beatNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int tempoBpm READ tempoBpm WRITE setTempoBpm NOTIFY tempoChanged)
 
     QML_ELEMENT
 
@@ -158,6 +159,9 @@ public:
     bool isMetronomeEnabled() const;
     int measureNumber() const;
     int beatNumber() const;
+    //! The playback tempo (score tempo at the playhead times the speed factor) in beats per minute
+    int tempoBpm() const;
+    void setTempoBpm(int bpm);
 
     Q_INVOKABLE void togglePlay();
     Q_INVOKABLE void rewindToStart();
@@ -197,6 +201,7 @@ signals:
     void isPlayAllowedChanged();
     void isMetronomeEnabledChanged();
     void playPositionChanged();
+    void tempoChanged();
 
 private:
     notation::ViewMode sessionViewMode() const;
