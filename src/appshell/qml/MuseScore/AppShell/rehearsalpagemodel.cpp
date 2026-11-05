@@ -235,6 +235,10 @@ void RehearsalPageModel::load()
         emit isPlayAllowedChanged();
     });
 
+    playbackController()->currentTempoChanged().onNotify(this, [this]() {
+        emit tempoChanged();
+    });
+
     notationConfiguration()->isMetronomeEnabledChanged().onNotify(this, [this]() {
         emit isMetronomeEnabledChanged();
     });
@@ -490,6 +494,26 @@ bool RehearsalPageModel::isPlaying() const
 bool RehearsalPageModel::isPlayAllowed() const
 {
     return playbackController()->isPlayAllowed();
+}
+
+int RehearsalPageModel::tempoBpm() const
+{
+    return playbackController()->currentTempo().valueBpm;
+}
+
+void RehearsalPageModel::setTempoBpm(int bpm)
+{
+    const double multiplier = playbackController()->tempoMultiplier();
+    const int currentBpm = tempoBpm();
+    if (bpm <= 0 || currentBpm <= 0 || multiplier <= 0.0) {
+        return;
+    }
+
+    //! NOTE The tempo of the score at the playhead is the current tempo without the speed factor. The factor
+    //! then applies to the whole score, same as the speed setting of the playback toolbar
+    const double scoreBpm = currentBpm / multiplier;
+    playbackController()->setTempoMultiplier(std::clamp(bpm / scoreBpm, 0.1, 3.0));
+    emit tempoChanged();
 }
 
 bool RehearsalPageModel::isMetronomeEnabled() const
