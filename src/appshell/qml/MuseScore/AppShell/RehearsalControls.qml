@@ -29,7 +29,7 @@ import Muse.UiComponents
 import MuseScore.AppShell
 
 //! Rehearsal controls: to start, play/pause, position, metronome, view mode,
-//! tracks panel toggle, (optionally) view mode and presentation window toggle.
+//! tracks panel toggle, (optionally) view mode and presentation window toggle, tempo in BPM.
 //! Used in the main tab row and in the floating bar of the immersive mode
 Item {
     id: root
@@ -200,6 +200,27 @@ Item {
 
             onClicked: {
                 root.pageModel.isPresentationWindowOpen = !root.pageModel.isPresentationWindowOpen
+            }
+        }
+
+        IncrementalPropertyControl {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 104
+            enabled: root.pageModel.isPlayAllowed
+
+            currentValue: root.pageModel.tempoBpm
+            minValue: 1
+            maxValue: 999
+            step: 1
+            decimals: 0
+            measureUnitsSymbol: qsTrc("appshell", "BPM")
+
+            navigation.panel: navPanel
+            navigation.order: 7
+            navigation.accessible.name: qsTrc("appshell", "Tempo in beats per minute")
+
+            onValueEdited: function(newValue) {
+                root.pageModel.tempoBpm = newValue
             }
         }
     }
