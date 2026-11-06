@@ -39,6 +39,7 @@
 #include "notation/inotation.h"
 #include "notation/imasternotation.h"
 #include "notation/iexcerptnotation.h"
+#include "notation/inotationplayback.h"
 #include "project/inotationproject.h"
 #include "project/projectcommands.h"
 #include "playback/playbackcommands.h"

@@ -112,10 +112,12 @@ the others are softly dimmed. Everyone knows at a glance who is singing.
 ## Get started
 
 1. Download the latest version from the [Releases page](https://github.com/coljacarls/ScoreRehearsal/releases).
-2. Unzip it anywhere you like and start `ScoreRehearsal.exe`.
+2. **Windows:** unzip `ScoreRehearsal-<version>-win64.zip` anywhere you like and start `ScoreRehearsal.exe`.
+   **Linux:** download `ScoreRehearsal-<version>-x86_64.AppImage`, make it executable
+   (`chmod +x ScoreRehearsal-*.AppImage`) and start it.
 3. Open your MuseScore file – and start rehearsing.
 
-ScoreRehearsal currently runs on Windows. Handy shortcuts: `Space` play/pause, `Ctrl+O` open a
+ScoreRehearsal runs on Windows and on Linux (x86_64). Handy shortcuts: `Space` play/pause, `Ctrl+O` open a
 score, `F11` full screen. Playback stutters? In **… → Settings** you can choose the audio device and
 a larger buffer.
 

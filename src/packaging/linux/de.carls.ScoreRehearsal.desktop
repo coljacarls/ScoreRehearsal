@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=ScoreRehearsal
+GenericName=Rehearsal player
+Comment=Rehearse with MuseScore files
+Exec=ScoreRehearsal %f
+Icon=ScoreRehearsal
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+MimeType=application/x-musescore;
+StartupWMClass=ScoreRehearsal

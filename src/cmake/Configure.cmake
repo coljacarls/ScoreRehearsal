@@ -52,6 +52,7 @@ message(STATUS "ScoreRehearsal version: ${SCOREREHEARSAL_VERSION}")
 add_compile_definitions(
     MUE_APP_ORGANIZATION_NAME="ScoreRehearsal"
     MUE_APP_ORGANIZATION_DOMAIN="scorerehearsal.carls.de"
+    MUE_APP_DESKTOP_FILE_NAME="de.carls.ScoreRehearsal"
 )
 
 # --- Branding: no MuseScore name, logo or identifiers ---
