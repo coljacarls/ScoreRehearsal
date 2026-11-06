@@ -9,6 +9,8 @@
 #
 # The tag is created only after the build succeeded, on the merge commit.
 #
+# The Windows build creates the release; the Linux build then adds the AppImage to it.
+#
 # The release notes are the pull request description (write the new features, improvements and
 # fixes there), followed by the notes GitHub generates (merged pull requests, full changelog).
 
@@ -136,3 +138,69 @@ jobs:
           body: ${{ github.event.pull_request.body }}
           generate_release_notes: true
           files: ${{ env.ZIP }}
+
+  build-linux:
+    # needs the release (and its tag) created by the Windows build; a failure here leaves the Windows
+    # release in place and can be re-run on its own
+    needs: [version, build]
+    if: needs.version.outputs.version != ''
+    # same runner as MuseScore's Linux CI: g++-14 is available and the glibc baseline matches upstream AppImages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    env:
+      SCOREREHEARSAL_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             g++-14 cmake ninja-build pkg-config curl file             libasound2-dev libsndfile1-dev libvulkan-dev libgl1-mesa-dev libglu1-mesa-dev             libxkbcommon-dev libxkbcommon-x11-dev libxcb-cursor0 libxcb-icccm4 libxcb-image0             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1             libfontconfig1-dev libdbus-1-dev libgtk-3-dev libnss3 desktop-file-utils
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.11.2
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: qt5compat qtnetworkauth qtshadertools qtwebsockets
+          cache: true
+          # same aqtinstall sources as MuseScore's own CI for Qt 6.11
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git
+          py7zrversion: '@git+https://github.com/miurahr/py7zr.git'
+
+      - name: Build
+        run: |
+          export QT_DIR="$QT_ROOT_DIR"
+          ./build.sh install Release
+
+      - name: Package AppImage
+        run: |
+          export QT_DIR="$QT_ROOT_DIR"
+          mkdir -p dist
+          src/packaging/linux/make_appimage.sh build/Release/install "dist/ScoreRehearsal-$SCOREREHEARSAL_VERSION-x86_64.AppImage"
+          (cd dist && sha256sum *.AppImage > "ScoreRehearsal-$SCOREREHEARSAL_VERSION-x86_64.AppImage.sha256")
+          ls -lh dist
+
+      - name: Smoke test
+        # still running after the timeout (exit code 124) means the app started without crashing
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen MU_QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 20 dist/ScoreRehearsal-*.AppImage
+          code=$?
+          echo "exit code: $code"
+          [ "$code" = 124 ] || [ "$code" = 0 ]
+
+      - name: Add AppImage to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "v$SCOREREHEARSAL_VERSION" dist/* --clobber

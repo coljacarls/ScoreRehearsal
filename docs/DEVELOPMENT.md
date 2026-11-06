@@ -61,10 +61,26 @@ The app version comes from the `SCOREREHEARSAL_VERSION` environment variable (se
 for local builds, from `git describe --tags` (`0.0.0-dev` without tags). It is shown on the
 start screen and in the About dialog.
 
+## Building (Linux)
+
+Requirements: GCC 14, CMake, Ninja, Qt 6.11 for GCC (default location `~/Qt/6.11.2/gcc_64`,
+override with `QT_DIR`) and the development packages listed in `.github/workflows/linux-build.yml`.
+
+```
+./build.sh install Release
+build/Release/install/bin/ScoreRehearsal path/to/score.mscz
+```
+
+`build.sh` takes the same actions as `build.cmd`. `src/packaging/linux/make_appimage.sh
+build/Release/install <name>.AppImage` packs the install directory into an AppImage. The
+`Linux build` workflow does this on every push to `feature/linux-port` (or manually) and keeps
+the AppImage as a workflow artifact.
+
 ## Releases
 
 `.github/workflows/release.yml` builds and publishes a GitHub release (zip of the install
-directory, tag `vX.Y.Z` on the merge commit) when a pull request is merged into `main` and
+directory, tag `vX.Y.Z` on the merge commit; the Linux AppImage and its checksum are added
+afterwards) when a pull request is merged into `main` and
 either its title contains a version (`Release v1.0.1`) or it has a label `release:major`,
 `release:minor` or `release:patch` (bumps the latest tag). Other pull requests do not release.
 
