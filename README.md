@@ -20,9 +20,11 @@ moving a note by accident. Your score stays exactly as it is. Promise.
   "Save changes?" pop-ups, no surprises the next time you open it in MuseScore.
 - **Feels like home.** It uses the same engine and the same sounds as MuseScore, so your score looks
   and sounds just like you know it.
-- **Remembers your rehearsal.** Your mix, your panning, your groups, the part you looked at, the bar you stopped
-  at, even your markings: everything is waiting for you the next time you open the score.
+- **Remembers your rehearsal.** Your mix, your panning, your groups, your instruments, the part you looked at,
+  the bar you stopped at, even your markings: everything is waiting for you the next time you open the score.
 - **Quiet and private.** No account, no cloud, no internet connection needed.
+- **Windows and Linux.** The same app on your Windows laptop or tablet and on your Linux machine
+  _(Linux is new in 1.4)_.
 
 ## Everything a rehearsal needs
 
@@ -31,6 +33,15 @@ moving a note by accident. Your score stays exactly as it is. Promise.
 Tap anywhere in the score and the playhead jumps there. Hit play and off you go, right from that
 beat. Switch between the familiar page view and a continuous view that scrolls along with the music.
 The metronome is just one button away, with its own volume fader.
+
+### Change the tempo _(new in 1.3.1)_
+
+Break it down during rehearsal and exercise at a lower **BPM**. The new field in the controls shows the tempo at the playhead. Type
+the tempo you want to rehearse at and the whole score follows – it keeps its tempo changes and
+simply plays faster or slower overall. ScoreRehearsal always starts at the tempo written in your
+score, even if the tempo marking sits behind a few bars of rest.
+
+![The rehearsal controls with the BPM field, set to a slower tempo](docs/img/tempo-bpm.png)
 
 ### Your mixing desk for every voice
 
@@ -53,12 +64,28 @@ or put the whole group on solo.
 
 Open fader groups at any time to have control over the details.
 
-### Place every voice in the room
+### Place every voice in the room _(new in 1.2)_
 
 Switch the tracks sidebar from **Volume** to **Pan** and every voice gets a slider to move it
 between the left and the right speaker. The sliders look different from the volume faders, so you
 always know which mode you are in. Tap or swipe to place a voice, double tap its value to return
 to the position stored in the score, and **All centered** puts everybody back in the middle.
+
+<img src="docs/img/pan-mode.png" alt="The tracks sidebar in pan mode, voices placed between left and right" width="320">
+
+### Pick the instrument for every voice _(new in 1.3)_
+
+Rehearse with the sound you actually want to hear: give every voice or fader group its own
+instrument – a clear piano for the alto line, a flute for the soprano, a choir for the rest. Open
+the options menu next to **All on** and choose **Playback instruments**. You find your instrument
+in columns, your favorites first, and the choice is shown right under the track name. Mark the
+instruments you use all the time as favorites; the dialog reopens where you picked last time.
+Your choices are remembered per score.
+
+<p>
+  <img src="docs/img/playback-instruments-menu.png" alt="The options menu in the tracks sidebar with Playback instruments" width="300">
+  <img src="docs/img/playback-instruments-dialog.png" alt="The Playback instruments dialog with the column browser and favorites" width="460">
+</p>
 
 ### Parts at your fingertips
 
@@ -117,9 +144,9 @@ the others are softly dimmed. Everyone knows at a glance who is singing.
    (`chmod +x ScoreRehearsal-*.AppImage`) and start it.
 3. Open your MuseScore file – and start rehearsing.
 
-ScoreRehearsal runs on Windows and on Linux (x86_64). Handy shortcuts: `Space` play/pause, `Ctrl+O` open a
-score, `F11` full screen. Playback stutters? In **… → Settings** you can choose the audio device and
-a larger buffer.
+ScoreRehearsal runs on Windows and on Linux (x86*64) *(Linux is new in 1.4)\_. Handy shortcuts: `Space`
+play/pause, `Ctrl+O` open a score, `F11` full screen. Playback stutters? In **… → Settings** you can
+choose the audio device and a larger buffer.
 
 ### "Windows protected your PC"? Don't worry.
 
