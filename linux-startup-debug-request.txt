@@ -1,0 +1,87 @@
+Hi, thanks for trying ScoreRehearsal on Linux, and sorry that it didn't start.
+
+"Nothing happens" usually means an error message is hidden, so I need you to start the app from a terminal and send me what it prints. This takes about five minutes.
+
+
+A NOTE ON PRIVACY
+-----------------
+
+I only ask for what I need to find the problem. I don't need your name, your computer's name, your IP address or any of your files.
+
+Terminal output often contains your user name (for example in paths like /home/anna/Downloads/...) and your computer's name (in the terminal prompt, like anna@laptop). Before you send anything, please replace those with "USER" and "HOST" - that is perfectly fine for me. Please don't post the output in a public place; send it to me directly.
+
+
+STEP 1 - Start it from a terminal
+---------------------------------
+
+Open a terminal in the folder where you saved the AppImage and run:
+
+    chmod +x ScoreRehearsal-*.AppImage
+    ./ScoreRehearsal-*.AppImage
+
+Please copy what it prints (even if it is only one line), or tell me that it prints nothing at all. If you can, leave out the prompt line itself.
+
+If it says "Permission denied", move the file into your home folder (for example ~/Applications) and try again.
+
+
+STEP 2 - Start it without FUSE
+------------------------------
+
+Many newer distributions (e.g. Ubuntu 22.04 and later) don't include FUSE 2, which AppImages need. This variant doesn't need it:
+
+    ./ScoreRehearsal-*.AppImage --appimage-extract-and-run
+
+Does the app start now? Either way, please send me the output.
+
+
+STEP 3 - Basic system information
+---------------------------------
+
+These four lines only print the system type, distribution, C library version and desktop - nothing personal:
+
+    uname -m
+    grep PRETTY_NAME /etc/os-release
+    ldd --version | head -1
+    echo "Desktop: $XDG_CURRENT_DESKTOP, session: $XDG_SESSION_TYPE"
+
+And please check that the download is intact (needs the .sha256 file from the release page in the same folder). Just tell me whether it says OK or FAILED:
+
+    sha256sum -c ScoreRehearsal-*.AppImage.sha256
+
+
+That is all I need for now. Often this already shows the problem. If not, I may ask you for the following steps - please don't do them unless I ask.
+
+
+STEP 4 (only if I ask) - Try other display and graphics settings
+-----------------------------------------------------------------
+
+Run these one at a time and tell me which of them (if any) opens a window:
+
+    MU_QT_QPA_PLATFORM=xcb ./ScoreRehearsal-*.AppImage --appimage-extract-and-run
+    MU_QT_QPA_PLATFORM=wayland ./ScoreRehearsal-*.AppImage --appimage-extract-and-run
+    QT_QUICK_BACKEND=software ./ScoreRehearsal-*.AppImage --appimage-extract-and-run
+
+If the window never appears or the app crashes, also tell me your graphics card:
+
+    lspci | grep -i -E "vga|3d"
+
+
+STEP 5 (only if I ask) - More detailed logs
+-------------------------------------------
+
+Qt debug log (lists where the app looks for its components, including paths in your home folder - please replace your user name before sending):
+
+    QT_DEBUG_PLUGINS=1 ./ScoreRehearsal-*.AppImage --appimage-extract-and-run 2> qt-debug.txt
+
+If the app started or crashed after starting, it writes a log file. This finds it:
+
+    find ~/.local/share -path "*ScoreRehearsal*" -name "*.log" 2>/dev/null
+
+Please open the newest file and have a quick look before sending it: it can contain the file names of scores you opened and your user name. Feel free to remove such lines or replace the names.
+
+If the app crashed, this shows only the lines about ScoreRehearsal:
+
+    journalctl --since "10 minutes ago" | grep -i "ScoreRehearsal"
+
+
+Thank you, with this I should be able to find out what's going on!
